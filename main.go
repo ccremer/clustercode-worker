@@ -3,70 +3,50 @@ package main
 import (
     "github.com/aellwein/slf4go"
     _ "github.com/aellwein/slf4go-native-adaptor"
+    "github.com/ccremer/clustercode-worker/compute"
     "github.com/ccremer/clustercode-worker/health"
+    "github.com/ccremer/clustercode-worker/messaging"
     "github.com/ccremer/clustercode-worker/util"
-    "github.com/go-cmd/cmd"
-    "os"
-    "os/exec"
-    "strings"
-    "time"
+    "github.com/micro/go-config"
+    "github.com/micro/go-config/source/env"
+    "github.com/micro/go-config/source/file"
 )
 
 var log slf4go.Logger
 
 func main() {
-
     log = slf4go.GetLogger("main")
 
-    health.StartServer()
+    log.Infof("Loading configuration...")
+    config.Load(
+        file.NewSource(file.WithPath("defaults.yaml")),
+        file.NewSource(file.WithPath("config.yaml")),
+        env.NewSource(env.WithStrippedPrefix("CC")),
+    )
+
+    log.SetLevel(util.StringToLogLevel(config.Get("log", "level").String("info")))
+    health.Init()
+    compute.Init()
+    messaging.Init()
 
     computeRole := "compute"
     shovelRole := "shovel"
 
-    role := os.Getenv("CC_ROLE")
+    messaging.Connect()
+
+    role := config.Get("role").String("compute")
     if role == computeRole {
-
+        compute.Start()
     } else if role == shovelRole {
-
+        panic("Not implemented yet")
     } else {
         util.PanicWithMessage("You need to specify this worker's role using CC_ROLE to one of %s",
             computeRole, shovelRole)
     }
 
-    path, err := exec.LookPath("ffmpeg")
-    util.PanicOnError(err)
-    log.Infof("ffmpeg executable is in %s", path)
+    health.StartServer()
 
-    command := path + " -hide_banner -y -t 20 -s 640x480 -f rawvideo -pix_fmt rgb24 -r 25 -i /dev/zero vendor/empty.mpeg"
-    log.Infof(command)
-
-    cmdArgs := strings.Fields(command)
-
-    cmdOptions := cmd.Options{
-        Buffered:  false,
-        Streaming: true,
-    }
-
-    ffmpeg := cmd.NewCmdOptions(cmdOptions, cmdArgs[0], cmdArgs[1:]...)
-
-    ffmpeg.Start()
-
-    go func() {
-        for {
-            select {
-            case line := <-ffmpeg.Stdout:
-                log.Info(line)
-            case line := <-ffmpeg.Stderr:
-                log.Error(line)
-            }
-        }
-    }()
-
-    // Run and wait for Cmd to return, discard Status
-    <-ffmpeg.Start()
-
-    // Cmd has finished but wait for goroutine to print all lines
-    for len(ffmpeg.Stdout) > 0 || len(ffmpeg.Stderr) > 0 {
-        time.Sleep(10 * time.Millisecond)
-    }
+    forever := make(chan bool)
+    log.Infof("Startup complete")
+    <-forever
 }

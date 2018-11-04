@@ -1,21 +1,20 @@
-package compute
+package main
 
 import (
     "github.com/streadway/amqp"
-    "log"
     "os"
     "strings"
+    "testing"
 )
 
 func failOnError(err error, msg string) {
     if err != nil {
-        log.Fatalf("%s: %s", msg, err)
+        panic(err)
     }
 }
 
-func main() {
+func TestMain(m *testing.M) {
 
-    log.Println("Opening rabbitmq")
     conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
     failOnError(err, "Failed to connect to RabbitMQ")
     defer conn.Close()
@@ -25,8 +24,8 @@ func main() {
     defer ch.Close()
 
     q, err := ch.QueueDeclare(
-        "hello", // name
-        false,   // durable
+        "task-added", // name
+        true,   // durable
         false,   // delete when unused
         false,   // exclusive
         false,   // no-wait
@@ -46,7 +45,6 @@ func main() {
             Body:         []byte(body),
         })
     failOnError(err, "Failed to publish a message")
-    log.Printf(" [x] Sent %s", body)
 }
 
 

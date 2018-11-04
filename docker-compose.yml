@@ -1,0 +1,12 @@
+version: "3.0"
+services:
+  rabbitmq:
+    container_name: rabbitmq
+    image: "rabbitmq:3-alpine"
+    ports:
+      - "5672:5672"
+
+networks:
+  default:
+    external:
+      name: clustercode
