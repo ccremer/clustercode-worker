@@ -19,4 +19,12 @@ Worker microservice for clustercode [WIP]
 
 ## Testing
 
-not sure yet
+not sure yet... soonTM
+
+# Concept
+
+- Split video with `ffmpeg -i movie.mp4 -c copy -map 0 -segment_time 120 -f segment movie_segment_%d.mkv` on shovel node
+- Transcode each segment with `ffmpeg -i movie_segment_1.mp4 -c:v copy -c:a copy movie_segment_1.mkv`
+  on compute node (with whatever parameters)
+- Create the concat file on shovel node: `echo "file movie_segment_1.mkv" >> concat.txt` (make sure they are sorted!)
+- Merge the segments back into 1 file: `ffmpeg -f concat -i concat.txt -c copy movie_out.mkv`

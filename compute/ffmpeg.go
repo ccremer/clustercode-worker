@@ -11,6 +11,7 @@ import (
 func Start() {
 
     completeChan := make(chan messaging.Message)
+    cancelChan := make(chan messaging.TaskCancelledEvent)
 
     messaging.OpenTaskAddedQueue(func(msg *messaging.Message) {
         task := messaging.TaskAddedEvent{}
@@ -32,20 +33,12 @@ func Start() {
         log.Infof("Starting process: %s", ffmpeg.Args)
         ffmpeg.Start()
 
-        go func(cmd *cmd.Cmd) {
-            for {
-                select {
-                case line := <-cmd.Stdout:
-                    log.Info(line)
-                case line := <-cmd.Stderr:
-                    log.Error(line)
-                }
-            }
-        }(ffmpeg)
+        go printOutputLines(ffmpeg)
+        go listenForCancelMessage(ffmpeg, cancelChan, &task)
 
         status := <-ffmpeg.Start()
         waitForOutput(ffmpeg)
-        log.Debugf("Process finished with exit code %d", status.Exit)
+        log.Debugf("Process finished with exit code %d.", status.Exit)
 
         if status.Error != nil || status.Exit > 1 {
             msg.SetIncompleteAndRequeue()
@@ -54,11 +47,38 @@ func Start() {
             sendCompletedMessage(task, completeChan)
         }
 
-        log.Infof("Task slice finished")
+        log.Infof("Task slice finished.")
     })
     log.Infof("Listening for task slices.")
 
     messaging.OpenTaskCompleteQueue(completeChan)
+}
+
+func listenForCancelMessage(
+    ffmpeg *cmd.Cmd,
+    cancelChan chan messaging.TaskCancelledEvent,
+    currentTask *messaging.TaskAddedEvent,
+) {
+    for {
+        event := <-cancelChan
+        if event.JobID == currentTask.JobID {
+            log.Warnf("Cancelling task: %s", event.JobID)
+            ffmpeg.Stop()
+        } else {
+            log.Debugf("TaskCancelledEvent %s does not match current job %s", event.JobID, currentTask.JobID)
+        }
+    }
+}
+
+func printOutputLines(cmd *cmd.Cmd) {
+    for {
+        select {
+        case line := <-cmd.Stdout:
+            log.Info(line)
+        case line := <-cmd.Stderr:
+            log.Error(line)
+        }
+    }
 }
 
 func sendCompletedMessage(task messaging.TaskAddedEvent, completeChan chan messaging.Message) {
@@ -76,4 +96,3 @@ func waitForOutput(ffmpeg *cmd.Cmd) {
         time.Sleep(10 * time.Millisecond)
     }
 }
-

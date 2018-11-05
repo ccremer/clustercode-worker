@@ -32,7 +32,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
     dto.Messaging = "unknown"
     json, _ := messaging.ToJson(dto)
     fmt.Fprint(w, json)
-    log.Debugf("out: %s", json)
+    log.Debugf("response: %s", json)
 }
 
 func checkOutputDir(path string) string {

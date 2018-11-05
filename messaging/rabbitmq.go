@@ -8,6 +8,34 @@ import (
 
 var connection *amqp.Connection
 
+type queueOptions struct {
+    exclusive    bool
+    durable      bool
+    autoDelete   bool
+    noWait       bool
+    internal     bool
+    routingKey   string
+    exchangeName string
+    exchangeType string
+    queueName    string
+    args         amqp.Table
+}
+
+func newQueueOptions() queueOptions {
+    return queueOptions{
+        exclusive:    false,
+        durable:      true,
+        autoDelete:   false,
+        noWait:       false,
+        queueName:    "",
+        args:         nil,
+        routingKey:   "",
+        exchangeName: "",
+        exchangeType: "fanout",
+        internal:     false,
+    }
+}
+
 func Connect() *amqp.Connection {
     if connection != nil {
         return connection
@@ -21,8 +49,10 @@ func Connect() *amqp.Connection {
 }
 
 func OpenTaskAddedQueue(callback func(msg *Message)) {
-    channel, q := createChannel(
-        config.Get("rabbitmq", "channels", "task", "added").String("task-added"))
+    options := newQueueOptions()
+    options.queueName = config.Get("rabbitmq", "channels", "task", "added").String("task-added")
+    channel := createChannel()
+    q := createQueue(&options, channel)
 
     ensureOnlyOneConsumerActive(channel)
 
@@ -50,8 +80,10 @@ func OpenTaskAddedQueue(callback func(msg *Message)) {
 }
 
 func OpenTaskCompleteQueue(supplier chan Message) {
-    channel, q := createChannel(
-        config.Get("rabbitmq", "channels", "task", "completed").String("task-completed"))
+    options := newQueueOptions()
+    options.queueName = config.Get("rabbitmq", "channels", "task", "completed").String("task-completed")
+    channel := createChannel()
+    q := createQueue(&options, channel)
     exchange, mandatory, immediate := "", false, false
 
     go func(channel *amqp.Channel) {
@@ -72,22 +104,67 @@ func OpenTaskCompleteQueue(supplier chan Message) {
     }(channel)
 }
 
-func createChannel(queueName string) (*amqp.Channel, amqp.Queue) {
-    log.Debugf("Opening a new channel %s...", queueName)
-    channel, err := connection.Channel()
-    util.PanicOnErrorf("Failed to open channel %[2]s: %[1]s", err, queueName)
+func OpenTaskCancelledQueue(callback func(msg *Message)) {
+    channel := createChannel()
+    options := newQueueOptions()
 
-    durable, autoDelete, exclusive, noWait := true, false, false, false
+    options.exchangeName = config.Get("rabbitmq", "channels", "task", "cancelled").String("task-cancelled")
+    options.autoDelete = false
+    options.durable = true
+    createExchange(&options, channel)
+
+    options.queueName = ""
+    options.exclusive = true
+    options.durable = false
+    q := createQueue(&options, channel)
+
+    options.queueName = q.Name
+    bindToExchange(&options, channel)
+}
+
+func createChannel() *amqp.Channel {
+    log.Debugf("Opening a new channel.")
+    channel, err := connection.Channel()
+    util.PanicOnErrorf("Failed to open channel: %[1]s", err)
+    return channel
+}
+
+func createQueue(o *queueOptions, channel *amqp.Channel) amqp.Queue {
+    log.Debugf("Creating queue %s", o.queueName)
     q, err := channel.QueueDeclare(
-        queueName,
-        durable,
-        autoDelete,
-        exclusive,
-        noWait,
-        nil,
+        o.queueName,
+        o.durable,
+        o.autoDelete,
+        o.exclusive,
+        o.noWait,
+        o.args,
     )
-    util.PanicOnErrorf("Failed to declare queue %[2]s: %[1]s", err, queueName)
-    return channel, q
+    util.PanicOnErrorf("Failed to declare queue %[2]s: %[1]s", err, o.queueName)
+    return q
+}
+
+func createExchange(o *queueOptions, channel *amqp.Channel) {
+    log.Debugf("Creating exchange %s", o.exchangeName)
+    err := channel.ExchangeDeclare(
+        o.queueName,
+        o.exchangeType,
+        o.durable,
+        o.autoDelete,
+        o.internal,
+        o.noWait,
+        o.args)
+    util.PanicOnErrorf("Failed to create exchange %[2]s: %[1]s", err, o.exchangeName)
+}
+
+func bindToExchange(o *queueOptions, channel *amqp.Channel) {
+    log.Debugf("Binding queue %s to exchangeName %s", o.queueName, o.exchangeName)
+    err := channel.QueueBind(
+        o.queueName,
+        o.routingKey,
+        o.exchangeName,
+        o.noWait,
+        o.args)
+    util.PanicOnErrorf("Failed to bind queue %[2]s: %[1]s", err, o.queueName)
 }
 
 func ensureOnlyOneConsumerActive(channel *amqp.Channel) {
