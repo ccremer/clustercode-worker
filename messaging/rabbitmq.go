@@ -19,6 +19,9 @@ type queueOptions struct {
     exchangeType string
     queueName    string
     args         amqp.Table
+    consumerName string
+    autoAck      bool
+    noLocal      bool
 }
 
 func newQueueOptions() queueOptions {
@@ -27,12 +30,15 @@ func newQueueOptions() queueOptions {
         durable:      true,
         autoDelete:   false,
         noWait:       false,
+        autoAck:      false,
         queueName:    "",
         args:         nil,
         routingKey:   "",
         exchangeName: "",
         exchangeType: "fanout",
         internal:     false,
+        noLocal:      false,
+        consumerName: "",
     }
 }
 
@@ -48,7 +54,7 @@ func Connect() *amqp.Connection {
     return connection
 }
 
-func OpenTaskAddedQueue(callback func(msg *Message)) {
+func OpenSliceAddedQueue(callback func(msg *Message)) {
     options := newQueueOptions()
     options.queueName = config.Get("rabbitmq", "channels", "task", "added").String("task-added")
     channel := createChannel()
@@ -56,30 +62,13 @@ func OpenTaskAddedQueue(callback func(msg *Message)) {
 
     ensureOnlyOneConsumerActive(channel)
 
-    autoAck, exclusive, noLocal, noWait := false, false, false, false
-    msgs, err := channel.Consume(
-        q.Name,
-        "",
-        autoAck,
-        exclusive,
-        noLocal,
-        noWait,
-        nil,
-    )
-    util.PanicOnErrorf("Failed to register a consumer: %s", err)
-    go func(callback func(message *Message)) {
-        for msg := range msgs {
-            log.Debugf("Received a message: %s", msg.Body)
-            payload := Message{
-                string(msg.Body),
-                &msg,
-            }
-            callback(&payload)
-        }
-    }(callback)
+    options.consumerName = q.Name
+    options.autoAck = false
+    msgs := createConsumer(&options, channel)
+    beginConsuming(msgs, callback)
 }
 
-func OpenTaskCompleteQueue(supplier chan Message) {
+func OpenSliceCompleteQueue(supplier chan Message) {
     options := newQueueOptions()
     options.queueName = config.Get("rabbitmq", "channels", "task", "completed").String("task-completed")
     channel := createChannel()
@@ -120,6 +109,9 @@ func OpenTaskCancelledQueue(callback func(msg *Message)) {
 
     options.queueName = q.Name
     bindToExchange(&options, channel)
+
+    msgs := createConsumer(&options, channel)
+    beginConsuming(msgs, callback)
 }
 
 func createChannel() *amqp.Channel {
@@ -146,7 +138,7 @@ func createQueue(o *queueOptions, channel *amqp.Channel) amqp.Queue {
 func createExchange(o *queueOptions, channel *amqp.Channel) {
     log.Debugf("Creating exchange %s", o.exchangeName)
     err := channel.ExchangeDeclare(
-        o.queueName,
+        o.exchangeName,
         o.exchangeType,
         o.durable,
         o.autoDelete,
@@ -167,6 +159,20 @@ func bindToExchange(o *queueOptions, channel *amqp.Channel) {
     util.PanicOnErrorf("Failed to bind queue %[2]s: %[1]s", err, o.queueName)
 }
 
+func createConsumer(o *queueOptions, channel *amqp.Channel) <-chan amqp.Delivery {
+    msgs, err := channel.Consume(
+        o.queueName,
+        o.consumerName,
+        o.autoAck,
+        o.exclusive,
+        o.noLocal,
+        o.noWait,
+        o.args,
+    )
+    util.PanicOnErrorf("Failed to consume queue: %[2]s: %[1]s", err, o.queueName)
+    return msgs
+}
+
 func ensureOnlyOneConsumerActive(channel *amqp.Channel) {
     prefetchCount, prefetchSize, global := 1, 0, false
     err := channel.Qos(
@@ -175,4 +181,17 @@ func ensureOnlyOneConsumerActive(channel *amqp.Channel) {
         global,
     )
     util.PanicOnErrorf("Failed to set QoS: %s", err)
+}
+
+func beginConsuming(msgs <-chan amqp.Delivery, callback func(msg *Message)) {
+    go func(msgs <-chan amqp.Delivery) {
+        for msg := range msgs {
+            log.Debugf("Received a message: %s", msg.Body)
+            payload := Message{
+                string(msg.Body),
+                &msg,
+            }
+            callback(&payload)
+        }
+    }(msgs)
 }

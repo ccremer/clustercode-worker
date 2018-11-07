@@ -5,7 +5,7 @@ import (
     "github.com/streadway/amqp"
 )
 
-type PreTask struct {
+type TaskAddedEvent struct {
     JobID     string `json:"job_id"`
     File      string
     Priority  int
@@ -14,13 +14,13 @@ type PreTask struct {
     Args      []string
 }
 
-type TaskAddedEvent struct {
-    JobID string `json:"job_id"`
-    Slice int    `json:"slice"`
-    Args      []string
+type SliceAddedEvent struct {
+    JobID   string `json:"job_id"`
+    SliceNr int    `json:"slice_nr"`
+    Args    []string
 }
 
-type TaskCompleteEvent struct {
+type SliceCompleteEvent struct {
     JobID    string `json:"job_id"`
     FileHash string `json:"file_hash"`
     SliceNr  int    `json:"slice_nr"`

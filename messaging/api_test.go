@@ -20,7 +20,7 @@ func TestDeserializePreTask(t *testing.T) {
             "slice_size": 120
         }
         `)
-    expected := PreTask{
+    expected := TaskAddedEvent{
         Args:      []string{"arg1", "arg with space"},
         File:      "0/path/to/file.ext",
         JobID:     "620b8251-52a1-4ecd-8adc-4fb280214bba",
@@ -29,7 +29,7 @@ func TestDeserializePreTask(t *testing.T) {
         FileHash:  "b8934ef001960cafc224be9f1e1ca82c",
     }
 
-    result := PreTask{}
+    result := TaskAddedEvent{}
     FromJson(json, &result)
 
     assert.Equal(t, expected, result)

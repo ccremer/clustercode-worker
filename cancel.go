@@ -13,6 +13,10 @@ func failOnError(err error, msg string) {
     }
 }
 
+func main() {
+    TestMain(nil)
+}
+
 func TestMain(m *testing.M) {
 
     conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
@@ -23,26 +27,27 @@ func TestMain(m *testing.M) {
     failOnError(err, "Failed to open a channel")
     defer ch.Close()
 
-    q, err := ch.QueueDeclare(
-        "task-added", // name
-        true,   // durable
-        false,   // delete when unused
-        false,   // exclusive
-        false,   // no-wait
-        nil,     // arguments
+
+    err = ch.ExchangeDeclare(
+        "task-cancelled",   // name
+        "fanout", // type
+        true,     // durable
+        false,    // auto-deleted
+        false,    // internal
+        false,    // no-wait
+        nil,      // arguments
     )
-    failOnError(err, "Failed to declare a queue")
+    failOnError(err, "Failed to declare a exchange")
 
     body := bodyFrom(os.Args)
     err = ch.Publish(
-        "",           // exchange
-        q.Name,       // routing key
-        false,        // mandatory
-        false,
-        amqp.Publishing {
-            DeliveryMode: amqp.Persistent,
-            ContentType:  "text/plain",
-            Body:         []byte(body),
+        "task-cancelled", // exchange
+        "",     // routing key
+        false,  // mandatory
+        false,  // immediate
+        amqp.Publishing{
+            ContentType: "application/json",
+            Body:        []byte(body),
         })
     failOnError(err, "Failed to publish a message")
 }
