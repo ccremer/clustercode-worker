@@ -8,32 +8,23 @@ import (
     "time"
 )
 
+var taskCompleteChan chan messaging.SliceCompleteEvent
+var taskCancelledChan chan messaging.TaskCancelledEvent
+
 func Start() {
 
-    completeChan := make(chan messaging.Message)
-    cancelChan := make(chan messaging.TaskCancelledEvent)
+    taskCompleteChan = make(chan messaging.SliceCompleteEvent)
+    taskCancelledChan = make(chan messaging.TaskCancelledEvent)
 
-    messaging.OpenSliceAddedQueue(func(msg *messaging.Message) {
-        task := messaging.SliceAddedEvent{}
-        err := messaging.FromJson(msg.Body, &task)
-        util.PanicOnErrorf("Could not deserialize message: %s. Please purge the invalid messages.", err)
-
-        handleTaskAddedEvent(&task, cancelChan, msg, completeChan)
-    })
+    messaging.OpenSliceAddedQueue(handleTaskAddedEvent)
     log.Infof("Listening for task slices.")
 
-    messaging.OpenSliceCompleteQueue(completeChan)
-    messaging.OpenTaskCancelledQueue(func(msg *messaging.Message) {
-        event := messaging.TaskCancelledEvent{}
-        err := messaging.FromJson(msg.Body, &event)
-        util.PanicOnErrorf("Could not deserialize message: %s. Please purge the invalid messages.", err)
-
-        cancelChan <- event
-
-    })
+    messaging.OpenSliceCompleteQueue(taskCompleteChan)
+    messaging.OpenTaskCancelledQueue(handleTaskCancelledEvent)
+    log.Infof("Listening for task cancellations.")
 }
 
-func handleTaskAddedEvent(slice *messaging.SliceAddedEvent, cancelChan chan messaging.TaskCancelledEvent, msg *messaging.Message, completeChan chan messaging.Message) {
+func handleTaskAddedEvent(slice messaging.SliceAddedEvent) {
     log.Infof("Processing slice: %s", slice.JobID)
     path, err := exec.LookPath("ffmpeg")
     util.PanicOnError(err)
@@ -46,33 +37,42 @@ func handleTaskAddedEvent(slice *messaging.SliceAddedEvent, cancelChan chan mess
     log.Infof("Starting process: %s", ffmpeg.Args)
     ffmpeg.Start()
     go printOutputLines(ffmpeg)
-    go listenForCancelMessage(ffmpeg, cancelChan, slice)
+    go listenForCancelMessage(ffmpeg, &slice)
     status := <-ffmpeg.Start()
     waitForOutput(ffmpeg)
     log.Debugf("Process finished with exit code %d.", status.Exit)
     if status.Error != nil || status.Exit > 1 {
-        msg.SetIncompleteAndRequeue()
+        if status.Exit < 255 {
+            slice.SetComplete(messaging.IncompleteAndRequeue)
+            log.Infof("Task failed.")
+        } else {
+            slice.SetComplete(messaging.Complete)
+            log.Infof("Task cancelled.")
+        }
     } else {
-        msg.SetComplete()
-        sendCompletedMessage(*slice, completeChan)
+        slice.SetComplete(messaging.Complete)
+        sendCompletedMessage(&slice)
+        log.Infof("Task slice finished.")
     }
-    log.Infof("Task slice finished.")
+}
+
+func handleTaskCancelledEvent(event messaging.TaskCancelledEvent) {
+    taskCancelledChan <- event
 }
 
 func listenForCancelMessage(
     ffmpeg *cmd.Cmd,
-    cancelChan chan messaging.TaskCancelledEvent,
     currentTask *messaging.SliceAddedEvent,
 ) {
     for {
-        event := <-cancelChan
+        event := <-taskCancelledChan
         if event.JobID == currentTask.JobID {
             log.Warnf("Cancelling task: %s", event.JobID)
             ffmpeg.Stop()
-            // TODO: Ack message, else it gets re-scheduled!
         } else {
             log.Debugf("TaskCancelledEvent %s does not match current job %s", event.JobID, currentTask.JobID)
         }
+        event.SetComplete(messaging.Complete)
     }
 }
 
@@ -87,13 +87,10 @@ func printOutputLines(cmd *cmd.Cmd) {
     }
 }
 
-func sendCompletedMessage(slice messaging.SliceAddedEvent, completeChan chan messaging.Message) {
-    json, _ := messaging.ToJson(messaging.SliceCompleteEvent{
+func sendCompletedMessage(slice *messaging.SliceAddedEvent) {
+    taskCompleteChan <- messaging.SliceCompleteEvent{
         SliceNr: slice.SliceNr,
         JobID:   slice.JobID,
-    })
-    completeChan <- messaging.Message{
-        Body: json,
     }
 }
 

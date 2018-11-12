@@ -5,8 +5,7 @@ import (
     "testing"
 )
 
-func TestDeserializePreTask(t *testing.T) {
-
+func TestDeserializeTaskAddedEvent(t *testing.T) {
     json := string(`
         {
             "file": "0/path/to/file.ext",
@@ -30,7 +29,66 @@ func TestDeserializePreTask(t *testing.T) {
     }
 
     result := TaskAddedEvent{}
-    FromJson(json, &result)
+    fromJson(json, &result)
+
+    assert.Equal(t, expected, result)
+}
+
+func TestDeserializeSliceAddedEvent(t *testing.T) {
+    json := string(`
+        {
+            "job_id": "620b8251-52a1-4ecd-8adc-4fb280214bba",
+            "args": [
+                "arg1",
+                "arg with space"
+            ],
+            "slice_nr": 34
+        }
+        `)
+    expected := SliceAddedEvent{
+        Args:    []string{"arg1", "arg with space"},
+        JobID:   "620b8251-52a1-4ecd-8adc-4fb280214bba",
+        SliceNr: 34,
+    }
+
+    result := SliceAddedEvent{}
+    fromJson(json, &result)
+
+    assert.Equal(t, expected, result)
+}
+
+func TestDeserializeSliceCompleteEvent(t *testing.T) {
+    json := string(`
+        {
+            "job_id": "620b8251-52a1-4ecd-8adc-4fb280214bba",
+            "slice_nr": 34,
+            "file_hash": "b8934ef001960cafc224be9f1e1ca82c"
+        }
+        `)
+    expected := SliceCompleteEvent{
+        JobID:    "620b8251-52a1-4ecd-8adc-4fb280214bba",
+        SliceNr:  34,
+        FileHash: "b8934ef001960cafc224be9f1e1ca82c",
+    }
+
+    result := SliceCompleteEvent{}
+    fromJson(json, &result)
+
+    assert.Equal(t, expected, result)
+}
+
+func TestDeserializeTaskCancelledEvent(t *testing.T) {
+    json := string(`
+        {
+            "job_id": "620b8251-52a1-4ecd-8adc-4fb280214bba"
+        }
+        `)
+    expected := TaskCancelledEvent{
+        JobID:    "620b8251-52a1-4ecd-8adc-4fb280214bba",
+    }
+
+    result := TaskCancelledEvent{}
+    fromJson(json, &result)
 
     assert.Equal(t, expected, result)
 }

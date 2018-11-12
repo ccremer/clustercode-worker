@@ -28,12 +28,10 @@ func main() {
 	health.Init()
 	compute.Init()
 	messaging.Init()
+	messaging.Connect()
 
 	computeRole := "compute"
 	shovelRole := "shovel"
-
-	messaging.Connect()
-
 	role := config.Get("role").String("compute")
 	if role == computeRole {
 		compute.Start()

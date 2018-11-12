@@ -5,49 +5,41 @@ import (
     "github.com/streadway/amqp"
 )
 
-type TaskAddedEvent struct {
-    JobID     string `json:"job_id"`
-    File      string
-    Priority  int
-    SliceSize int    `json:"slice_size"`
-    FileHash  string `json:"file_hash"`
-    Args      []string
-}
+const (
+    Complete             CompletionType = 0
+    Incomplete           CompletionType = 1
+    IncompleteAndRequeue CompletionType = 2
+)
 
-type SliceAddedEvent struct {
-    JobID   string `json:"job_id"`
-    SliceNr int    `json:"slice_nr"`
-    Args    []string
-}
+type (
+    CompletionType int
+    TaskAddedEvent struct {
+        JobID     string `json:"job_id"`
+        File      string
+        Priority  int
+        SliceSize int    `json:"slice_size"`
+        FileHash  string `json:"file_hash"`
+        Args      []string
+        delivery  *amqp.Delivery
+    }
+    SliceAddedEvent struct {
+        JobID    string `json:"job_id"`
+        SliceNr  int    `json:"slice_nr"`
+        Args     []string
+        delivery *amqp.Delivery
+    }
+    SliceCompleteEvent struct {
+        JobID    string `json:"job_id"`
+        FileHash string `json:"file_hash"`
+        SliceNr  int    `json:"slice_nr"`
+    }
+    TaskCancelledEvent struct {
+        JobID    string `json:"job_id"`
+        delivery *amqp.Delivery
+    }
+)
 
-type SliceCompleteEvent struct {
-    JobID    string `json:"job_id"`
-    FileHash string `json:"file_hash"`
-    SliceNr  int    `json:"slice_nr"`
-}
-
-type TaskCancelledEvent struct {
-    JobID string `json:"job_id"`
-}
-
-type Message struct {
-    Body     string
-    delivery *amqp.Delivery
-}
-
-func (msg *Message) SetComplete() {
-    msg.delivery.Ack(false)
-}
-
-func (msg *Message) SetIncomplete() {
-    msg.delivery.Nack(false, false)
-}
-
-func (msg *Message) SetIncompleteAndRequeue() {
-    msg.delivery.Nack(false, true)
-}
-
-func FromJson(json string, value interface{}) error {
+func fromJson(json string, value interface{}) error {
     arr := []byte(json)
     err := json2.Unmarshal(arr, &value)
     return err
