@@ -20,26 +20,21 @@ func Start() {
 
     messaging.OpenSliceAddedQueue(handleSliceAddedEvent)
     log.Infof("Listening for task slices.")
-
     messaging.OpenSliceCompleteQueue(sliceCompleteChan)
+
     messaging.OpenTaskCancelledQueue(handleTaskCancelledEvent)
     log.Infof("Listening for task cancellations.")
 }
 
 func handleSliceAddedEvent(slice messaging.SliceAddedEvent) {
-    log.Infof("Processing slice: %s", slice.JobID)
-    path, err := exec.LookPath("ffmpeg")
-    util.PanicOnError(err)
-    //command := path + " -hide_banner -y -t 20 -s 640x480 -f rawvideo -pix_fmt rgb24 -r 25 -i /dev/zero vendor/empty.mpeg"
-    cmdOptions := cmd.Options{
-        Buffered:  false,
-        Streaming: true,
-    }
-    ffmpeg := cmd.NewCmdOptions(cmdOptions, path, slice.Args[:]...)
-    log.Infof("Starting process: %s", ffmpeg.Args)
-    ffmpeg.Start()
+    log.Infof("Processing slice: %s, %d", slice.JobID, slice.SliceNr)
+    ffmpeg := startProcess(slice.Args)
     go printOutputLines(ffmpeg)
     go listenForCancelMessage(ffmpeg, &slice)
+    waitForProcessToFinish(ffmpeg, slice)
+}
+
+func waitForProcessToFinish(ffmpeg *cmd.Cmd, slice messaging.SliceAddedEvent) {
     status := <-ffmpeg.Start()
     waitForOutput(ffmpeg)
     log.Debugf("Process finished with exit code %d.", status.Exit)
@@ -60,29 +55,32 @@ func handleSliceAddedEvent(slice messaging.SliceAddedEvent) {
 
 func handleTaskAddedEvent(task messaging.TaskAddedEvent) {
     log.Infof("Processing task: %s", task.JobID)
-    path, err := exec.LookPath("ffmpeg")
-    util.PanicOnError(err)
-
-    ffmpeg := cmd.NewCmd(path, task.Args[:]...)
-    log.Infof("Starting process: %s", ffmpeg.Args)
-    ffmpeg.Start()
+    ffmpeg := startProcess(task.Args)
     go printOutputLines(ffmpeg)
     status := <-ffmpeg.Start()
     waitForOutput(ffmpeg)
     log.Debugf("Process finished with exit code %d.", status.Exit)
     if status.Error != nil || status.Exit > 1 {
-        if status.Exit < 255 {
-            task.SetComplete(messaging.IncompleteAndRequeue)
-            log.Infof("Task failed.")
-        } else {
-            task.SetComplete(messaging.Complete)
-            log.Infof("Task cancelled.")
-        }
+        task.SetComplete(messaging.IncompleteAndRequeue)
+        log.Infof("Task failed.")
     } else {
         task.SetComplete(messaging.Complete)
         sendTaskCompletedMessage(&task)
         log.Infof("Task finished.")
     }
+}
+
+func startProcess(args []string) *cmd.Cmd {
+    path, err := exec.LookPath("ffmpeg")
+    util.PanicOnError(err)
+    cmdOptions := cmd.Options{
+        Buffered:  false,
+        Streaming: true,
+    }
+    ffmpeg := cmd.NewCmdOptions(cmdOptions, path, replaceFields(args)[:]...)
+    log.Infof("Starting process: %s", ffmpeg.Args)
+    ffmpeg.Start()
+    return ffmpeg
 }
 
 func handleTaskCancelledEvent(event messaging.TaskCancelledEvent) {
@@ -109,9 +107,9 @@ func printOutputLines(cmd *cmd.Cmd) {
     for {
         select {
         case line := <-cmd.Stdout:
-            log.Info(line)
+            log.Tracef(line)
         case line := <-cmd.Stderr:
-            log.Error(line)
+            log.Tracef(line)
         }
     }
 }

@@ -6,7 +6,7 @@ require (
 	github.com/aellwein/slf4go v0.0.0-20180904194618-f2be6d016dbc
 	github.com/aellwein/slf4go-native-adaptor v0.0.0-20180904194845-eb00a06668ec
 	github.com/bitly/go-simplejson v0.5.0 // indirect
-	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
+	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869
 	github.com/bouk/monkey v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.4.7 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -23,6 +23,7 @@ require (
 	github.com/smartystreets/goconvey v0.0.0-20180222194500-ef6db91d284a // indirect
 	github.com/streadway/amqp v0.0.0-20180806233856-70e15c650864
 	github.com/stretchr/testify v1.2.2
+	github.com/thoas/go-funk v0.0.0-20181020164546-fbae87fb5b5c
 	golang.org/x/sys v0.0.0-20181031143558-9b800f95dbbc // indirect
 	gopkg.in/yaml.v2 v2.2.1 // indirect
 )
