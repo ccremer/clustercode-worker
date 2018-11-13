@@ -80,6 +80,26 @@ func OpenSliceAddedQueue(callback func(msg SliceAddedEvent)) {
     })
 }
 
+func OpenTaskAddedQueue(callback func(msg TaskAddedEvent)) {
+    options := newQueueOptions()
+    options.queueName = config.Get("rabbitmq", "channels", "task", "added").String("task-added")
+    channel := createChannel()
+    q := createQueue(&options, channel)
+
+    ensureOnlyOneConsumerActive(channel)
+
+    options.consumerName = q.Name
+    options.autoAck = false
+    msgs := createConsumer(&options, channel)
+    beginConsuming(msgs, func(d *amqp.Delivery) {
+        event := TaskAddedEvent{}
+        err := fromJson(string(d.Body), &event)
+        failOnDeserialize(err)
+        event.delivery = d
+        callback(event)
+    })
+}
+
 func OpenSliceCompleteQueue(supplier chan SliceCompletedEvent) {
     options := newQueueOptions()
     options.queueName = config.Get("rabbitmq", "channels", "slice", "completed").String("slice-completed")
@@ -106,6 +126,31 @@ func OpenSliceCompleteQueue(supplier chan SliceCompletedEvent) {
     }(channel)
 }
 
+func OpenTaskCompleteQueue(supplier chan TaskCompletedEvent) {
+    options := newQueueOptions()
+    options.queueName = config.Get("rabbitmq", "channels", "task", "completed").String("task-completed")
+    channel := createChannel()
+    q := createQueue(&options, channel)
+    exchange, mandatory, immediate := "", false, false
+
+    go func(channel *amqp.Channel) {
+        for {
+            msg := <-supplier
+            json, _ := ToJson(msg)
+            channel.Publish(
+                exchange,
+                q.Name,
+                mandatory,
+                immediate,
+                amqp.Publishing{
+                    DeliveryMode: amqp.Persistent,
+                    ContentType:  "application/json",
+                    Body:         []byte(json),
+                })
+            log.Debugf("Sent message to queue %s: %s", q.Name, json)
+        }
+    }(channel)
+}
 func OpenTaskCancelledQueue(callback func(msg TaskCancelledEvent)) {
     channel := createChannel()
     options := newQueueOptions()

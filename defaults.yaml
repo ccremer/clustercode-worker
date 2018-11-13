@@ -1,5 +1,9 @@
+---
+role: compute
+
 log:
   level: info
+
 rabbitmq:
   url: amqp://guest:guest@rabbitmq:5672/
   channels:
@@ -10,11 +14,13 @@ rabbitmq:
     slice:
       added: slice-added
       completed: slice-completed
-role: compute
+
 health:
   port: 8080
 
 input:
   dir: /input
+
 output:
   dir: /output
+  tmpdir: /var/tmp/clustercode

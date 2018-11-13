@@ -2,25 +2,21 @@ package compute
 
 import (
     "github.com/ccremer/clustercode-worker/messaging"
-    "github.com/ccremer/clustercode-worker/util"
+    "github.com/ccremer/clustercode-worker/process"
     "github.com/go-cmd/cmd"
-    "os/exec"
-    "time"
 )
 
 var sliceCompleteChan chan messaging.SliceCompletedEvent
-var taskCompleteChan chan messaging.TaskCompletedEvent
 var taskCancelledChan chan messaging.TaskCancelledEvent
 
 func Start() {
 
     sliceCompleteChan = make(chan messaging.SliceCompletedEvent)
-    taskCompleteChan = make(chan messaging.TaskCompletedEvent)
     taskCancelledChan = make(chan messaging.TaskCancelledEvent)
 
+    messaging.OpenSliceCompleteQueue(sliceCompleteChan)
     messaging.OpenSliceAddedQueue(handleSliceAddedEvent)
     log.Infof("Listening for task slices.")
-    messaging.OpenSliceCompleteQueue(sliceCompleteChan)
 
     messaging.OpenTaskCancelledQueue(handleTaskCancelledEvent)
     log.Infof("Listening for task cancellations.")
@@ -28,17 +24,17 @@ func Start() {
 
 func handleSliceAddedEvent(slice messaging.SliceAddedEvent) {
     log.Infof("Processing slice: %s, %d", slice.JobID, slice.SliceNr)
-    ffmpeg := startProcess(slice.Args)
-    go printOutputLines(ffmpeg)
+    ffmpeg := process.StartProcess(slice.Args)
+    go process.PrintOutputLines(ffmpeg)
     go listenForCancelMessage(ffmpeg, &slice)
     waitForProcessToFinish(ffmpeg, slice)
 }
 
 func waitForProcessToFinish(ffmpeg *cmd.Cmd, slice messaging.SliceAddedEvent) {
     status := <-ffmpeg.Start()
-    waitForOutput(ffmpeg)
+    process.WaitForOutput(ffmpeg)
     log.Debugf("Process finished with exit code %d.", status.Exit)
-    if status.Error != nil || status.Exit > 1 {
+    if status.Error != nil || status.Exit > 0 {
         if status.Exit < 255 {
             slice.SetComplete(messaging.IncompleteAndRequeue)
             log.Infof("Task failed.")
@@ -51,36 +47,6 @@ func waitForProcessToFinish(ffmpeg *cmd.Cmd, slice messaging.SliceAddedEvent) {
         sendSliceCompletedMessage(&slice)
         log.Infof("Task slice finished.")
     }
-}
-
-func handleTaskAddedEvent(task messaging.TaskAddedEvent) {
-    log.Infof("Processing task: %s", task.JobID)
-    ffmpeg := startProcess(task.Args)
-    go printOutputLines(ffmpeg)
-    status := <-ffmpeg.Start()
-    waitForOutput(ffmpeg)
-    log.Debugf("Process finished with exit code %d.", status.Exit)
-    if status.Error != nil || status.Exit > 1 {
-        task.SetComplete(messaging.IncompleteAndRequeue)
-        log.Infof("Task failed.")
-    } else {
-        task.SetComplete(messaging.Complete)
-        sendTaskCompletedMessage(&task)
-        log.Infof("Task finished.")
-    }
-}
-
-func startProcess(args []string) *cmd.Cmd {
-    path, err := exec.LookPath("ffmpeg")
-    util.PanicOnError(err)
-    cmdOptions := cmd.Options{
-        Buffered:  false,
-        Streaming: true,
-    }
-    ffmpeg := cmd.NewCmdOptions(cmdOptions, path, replaceFields(args)[:]...)
-    log.Infof("Starting process: %s", ffmpeg.Args)
-    ffmpeg.Start()
-    return ffmpeg
 }
 
 func handleTaskCancelledEvent(event messaging.TaskCancelledEvent) {
@@ -103,32 +69,9 @@ func listenForCancelMessage(
     }
 }
 
-func printOutputLines(cmd *cmd.Cmd) {
-    for {
-        select {
-        case line := <-cmd.Stdout:
-            log.Tracef(line)
-        case line := <-cmd.Stderr:
-            log.Tracef(line)
-        }
-    }
-}
-
 func sendSliceCompletedMessage(slice *messaging.SliceAddedEvent) {
     sliceCompleteChan <- messaging.SliceCompletedEvent{
         SliceNr: slice.SliceNr,
         JobID:   slice.JobID,
-    }
-}
-
-func sendTaskCompletedMessage(slice *messaging.TaskAddedEvent) {
-    taskCompleteChan <- messaging.TaskCompletedEvent{
-        JobID: slice.JobID,
-    }
-}
-
-func waitForOutput(ffmpeg *cmd.Cmd) {
-    for len(ffmpeg.Stdout) > 0 || len(ffmpeg.Stderr) > 0 {
-        time.Sleep(10 * time.Millisecond)
     }
 }

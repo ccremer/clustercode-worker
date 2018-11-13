@@ -6,6 +6,7 @@ import (
 	"github.com/ccremer/clustercode-worker/compute"
 	"github.com/ccremer/clustercode-worker/health"
 	"github.com/ccremer/clustercode-worker/messaging"
+	"github.com/ccremer/clustercode-worker/shovel"
 	"github.com/ccremer/clustercode-worker/util"
 	"github.com/micro/go-config"
 	"github.com/micro/go-config/source/env"
@@ -27,6 +28,7 @@ func main() {
 	log.SetLevel(util.StringToLogLevel(config.Get("log", "level").String("info")))
 	health.Init()
 	compute.Init()
+	shovel.Init()
 	messaging.Init()
 	messaging.Connect()
 
@@ -34,9 +36,11 @@ func main() {
 	shovelRole := "shovel"
 	role := config.Get("role").String("compute")
 	if role == computeRole {
+		log.Infof("Enable role: %s", computeRole)
 		compute.Start()
 	} else if role == shovelRole {
-		panic("Not implemented yet")
+		log.Infof("Enable role: %s", shovelRole)
+		shovel.Start()
 	} else {
 		util.PanicWithMessage("You need to specify this worker's role using CC_ROLE to one of %s",
 			computeRole, shovelRole)

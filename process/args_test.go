@@ -1,4 +1,4 @@
-package compute
+package process
 
 import (
     "github.com/bmizerany/assert"
