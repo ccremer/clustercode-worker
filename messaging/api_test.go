@@ -65,13 +65,13 @@ func TestDeserializeSliceCompleteEvent(t *testing.T) {
             "file_hash": "b8934ef001960cafc224be9f1e1ca82c"
         }
         `)
-    expected := SliceCompleteEvent{
+    expected := SliceCompletedEvent{
         JobID:    "620b8251-52a1-4ecd-8adc-4fb280214bba",
         SliceNr:  34,
         FileHash: "b8934ef001960cafc224be9f1e1ca82c",
     }
 
-    result := SliceCompleteEvent{}
+    result := SliceCompletedEvent{}
     fromJson(json, &result)
 
     assert.Equal(t, expected, result)

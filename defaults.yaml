@@ -7,6 +7,9 @@ rabbitmq:
       added: task-added
       completed: task-completed
       cancelled: task-cancelled
+    slice:
+      added: slice-added
+      completed: slice-completed
 role: compute
 health:
   port: 8080

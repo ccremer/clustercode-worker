@@ -8,23 +8,25 @@ import (
     "time"
 )
 
-var taskCompleteChan chan messaging.SliceCompleteEvent
+var sliceCompleteChan chan messaging.SliceCompletedEvent
+var taskCompleteChan chan messaging.TaskCompletedEvent
 var taskCancelledChan chan messaging.TaskCancelledEvent
 
 func Start() {
 
-    taskCompleteChan = make(chan messaging.SliceCompleteEvent)
+    sliceCompleteChan = make(chan messaging.SliceCompletedEvent)
+    taskCompleteChan = make(chan messaging.TaskCompletedEvent)
     taskCancelledChan = make(chan messaging.TaskCancelledEvent)
 
-    messaging.OpenSliceAddedQueue(handleTaskAddedEvent)
+    messaging.OpenSliceAddedQueue(handleSliceAddedEvent)
     log.Infof("Listening for task slices.")
 
-    messaging.OpenSliceCompleteQueue(taskCompleteChan)
+    messaging.OpenSliceCompleteQueue(sliceCompleteChan)
     messaging.OpenTaskCancelledQueue(handleTaskCancelledEvent)
     log.Infof("Listening for task cancellations.")
 }
 
-func handleTaskAddedEvent(slice messaging.SliceAddedEvent) {
+func handleSliceAddedEvent(slice messaging.SliceAddedEvent) {
     log.Infof("Processing slice: %s", slice.JobID)
     path, err := exec.LookPath("ffmpeg")
     util.PanicOnError(err)
@@ -51,8 +53,35 @@ func handleTaskAddedEvent(slice messaging.SliceAddedEvent) {
         }
     } else {
         slice.SetComplete(messaging.Complete)
-        sendCompletedMessage(&slice)
+        sendSliceCompletedMessage(&slice)
         log.Infof("Task slice finished.")
+    }
+}
+
+func handleTaskAddedEvent(task messaging.TaskAddedEvent) {
+    log.Infof("Processing task: %s", task.JobID)
+    path, err := exec.LookPath("ffmpeg")
+    util.PanicOnError(err)
+
+    ffmpeg := cmd.NewCmd(path, task.Args[:]...)
+    log.Infof("Starting process: %s", ffmpeg.Args)
+    ffmpeg.Start()
+    go printOutputLines(ffmpeg)
+    status := <-ffmpeg.Start()
+    waitForOutput(ffmpeg)
+    log.Debugf("Process finished with exit code %d.", status.Exit)
+    if status.Error != nil || status.Exit > 1 {
+        if status.Exit < 255 {
+            task.SetComplete(messaging.IncompleteAndRequeue)
+            log.Infof("Task failed.")
+        } else {
+            task.SetComplete(messaging.Complete)
+            log.Infof("Task cancelled.")
+        }
+    } else {
+        task.SetComplete(messaging.Complete)
+        sendTaskCompletedMessage(&task)
+        log.Infof("Task finished.")
     }
 }
 
@@ -87,10 +116,16 @@ func printOutputLines(cmd *cmd.Cmd) {
     }
 }
 
-func sendCompletedMessage(slice *messaging.SliceAddedEvent) {
-    taskCompleteChan <- messaging.SliceCompleteEvent{
+func sendSliceCompletedMessage(slice *messaging.SliceAddedEvent) {
+    sliceCompleteChan <- messaging.SliceCompletedEvent{
         SliceNr: slice.SliceNr,
         JobID:   slice.JobID,
+    }
+}
+
+func sendTaskCompletedMessage(slice *messaging.TaskAddedEvent) {
+    taskCompleteChan <- messaging.TaskCompletedEvent{
+        JobID: slice.JobID,
     }
 }
 

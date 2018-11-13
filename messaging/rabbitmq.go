@@ -62,7 +62,7 @@ func Connect() *amqp.Connection {
 
 func OpenSliceAddedQueue(callback func(msg SliceAddedEvent)) {
     options := newQueueOptions()
-    options.queueName = config.Get("rabbitmq", "channels", "task", "added").String("task-added")
+    options.queueName = config.Get("rabbitmq", "channels", "slice", "added").String("slice-added")
     channel := createChannel()
     q := createQueue(&options, channel)
 
@@ -80,9 +80,9 @@ func OpenSliceAddedQueue(callback func(msg SliceAddedEvent)) {
     })
 }
 
-func OpenSliceCompleteQueue(supplier chan SliceCompleteEvent) {
+func OpenSliceCompleteQueue(supplier chan SliceCompletedEvent) {
     options := newQueueOptions()
-    options.queueName = config.Get("rabbitmq", "channels", "task", "completed").String("task-completed")
+    options.queueName = config.Get("rabbitmq", "channels", "slice", "completed").String("slice-completed")
     channel := createChannel()
     q := createQueue(&options, channel)
     exchange, mandatory, immediate := "", false, false
@@ -224,12 +224,8 @@ func (e SliceAddedEvent) SetComplete(completionType CompletionType) {
     acknowledgeMessage(completionType, e.delivery)
 }
 
-func (e SliceAddedEvent) setDelivery(delivery *amqp.Delivery) {
-    e.delivery = delivery
-}
-
-func (e TaskCancelledEvent) setDelivery(delivery *amqp.Delivery) {
-    e.delivery = delivery
+func (e TaskAddedEvent) SetComplete(completionType CompletionType) {
+    acknowledgeMessage(completionType, e.delivery)
 }
 
 func acknowledgeMessage(completionType CompletionType, delivery *amqp.Delivery) {

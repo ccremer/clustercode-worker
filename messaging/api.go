@@ -22,20 +22,23 @@ type (
         Args      []string
         delivery  *amqp.Delivery
     }
+    TaskCompletedEvent struct {
+        JobID     string `json:"job_id"`
+    }
+    TaskCancelledEvent struct {
+        JobID    string `json:"job_id"`
+        delivery *amqp.Delivery
+    }
     SliceAddedEvent struct {
         JobID    string `json:"job_id"`
         SliceNr  int    `json:"slice_nr"`
         Args     []string
         delivery *amqp.Delivery
     }
-    SliceCompleteEvent struct {
+    SliceCompletedEvent struct {
         JobID    string `json:"job_id"`
         FileHash string `json:"file_hash"`
         SliceNr  int    `json:"slice_nr"`
-    }
-    TaskCancelledEvent struct {
-        JobID    string `json:"job_id"`
-        delivery *amqp.Delivery
     }
 )
 
