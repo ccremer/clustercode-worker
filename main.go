@@ -42,7 +42,7 @@ func main() {
 		log.Infof("Enable role: %s", shovelRole)
 		shovel.Start()
 	} else {
-		util.PanicWithMessage("You need to specify this worker's role using CC_ROLE to one of %s",
+		util.PanicWithMessage("You need to specify this worker's role using CC_ROLE to one of [%s, %s]",
 			computeRole, shovelRole)
 	}
 
