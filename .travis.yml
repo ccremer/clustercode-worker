@@ -21,10 +21,11 @@ install: go mod download
 script:
 - go test ./...
 - go build
+- .travis/docker-build.sh
 
 deploy:
 - provider: script
-  script: .travis/docker-build.sh && .travis/docker-release.sh
+  script: .travis/docker-release.sh
   on:
     tags: true
     all_branches: true
