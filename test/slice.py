@@ -17,7 +17,8 @@ message = json.dumps({
         "-pix_fmt", "rgb24",
         "-r", "25",
         "-i", "/dev/zero",
-        "${output_dir}/empty.mp4"],
+        "${output_dir}/empty.mp4"
+    ],
     "file": "vendor/empty.mpeg", "job_id": "asdf"
 })
 channel.basic_publish(exchange='',
