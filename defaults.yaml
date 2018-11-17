@@ -15,8 +15,13 @@ rabbitmq:
       added: slice-added
       completed: slice-completed
 
-health:
-  port: 8080
+api:
+  http:
+    port: 8080
+  ffmpeg:
+    protocol: unix
+    unix: /tmp/ffmpeg.sock
+
 
 input:
   dir: /input

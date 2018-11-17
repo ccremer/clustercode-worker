@@ -26,10 +26,10 @@ func PrintOutputLines(cmd *cmd.Cmd) {
         select {
         case line := <-cmd.Stdout:
             log.Debug(line)
-            println(line)
+            //println(line)
         case line := <-cmd.Stderr:
             log.Debug(line)
-            println(line)
+            //println(line)
         }
     }
 }

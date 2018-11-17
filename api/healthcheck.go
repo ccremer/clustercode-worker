@@ -1,9 +1,8 @@
-package health
+package api
 
 import (
     "fmt"
     "github.com/ccremer/clustercode-worker/messaging"
-    "github.com/ccremer/clustercode-worker/util"
     "github.com/micro/go-config"
     "net/http"
     "os"
@@ -13,21 +12,6 @@ type HealthCheckDto struct {
     InputDir  string `json:"input_dir"`
     OutputDir string `json:"output_dir"`
     Messaging string `json:"messaging"`
-}
-
-func StartServer() {
-    port := config.Get("health", "port").String("8080")
-    log.Infof("Starting health server on port %s", port)
-    http.HandleFunc("/", handleRoot)
-    http.HandleFunc("/health", handleHealth)
-    go func() {
-        err := http.ListenAndServe(":"+port, nil)
-        util.PanicOnError(err)
-    }()
-}
-
-func handleRoot(writer http.ResponseWriter, request *http.Request) {
-    fmt.Fprintf(writer, "This page is intentionally left blank. You might want to check /health")
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {

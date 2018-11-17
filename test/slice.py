@@ -17,7 +17,9 @@ message = json.dumps({
         "-pix_fmt", "rgb24",
         "-r", "25",
         "-i", "/dev/zero",
-        "${output_dir}/empty.mp4"
+        "${output_dir}/empty.mp4",
+        "-progress",
+        "unix:///tmp/ffmpeg.sock"
     ],
     "file": "vendor/empty.mpeg", "job_id": "asdf"
 })
