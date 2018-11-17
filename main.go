@@ -1,16 +1,16 @@
 package main
 
 import (
-    "github.com/aellwein/slf4go"
-    _ "github.com/aellwein/slf4go-native-adaptor"
-    "github.com/ccremer/clustercode-worker/api"
-    "github.com/ccremer/clustercode-worker/compute"
-    "github.com/ccremer/clustercode-worker/messaging"
-    "github.com/ccremer/clustercode-worker/shovel"
-    "github.com/ccremer/clustercode-worker/util"
-    "github.com/micro/go-config"
-    "github.com/micro/go-config/source/env"
-    "github.com/micro/go-config/source/file"
+	"github.com/aellwein/slf4go"
+	_ "github.com/aellwein/slf4go-native-adaptor"
+	"github.com/ccremer/clustercode-worker/api"
+	"github.com/ccremer/clustercode-worker/compute"
+	"github.com/ccremer/clustercode-worker/messaging"
+	"github.com/ccremer/clustercode-worker/shovel"
+	"github.com/ccremer/clustercode-worker/util"
+	"github.com/micro/go-config"
+	"github.com/micro/go-config/source/env"
+	"github.com/micro/go-config/source/file"
 )
 
 var log slf4go.Logger
@@ -49,11 +49,11 @@ func main() {
 }
 
 func LoadConfig() {
-    log.Infof("Loading configuration...")
-    config.Load(
-        file.NewSource(file.WithPath("defaults.yaml")),
-        file.NewSource(file.WithPath("config.yaml")),
-        env.NewSource(env.WithStrippedPrefix("CC")),
-    )
+	log.Infof("Loading configuration...")
+	config.Load(
+		file.NewSource(file.WithPath("defaults.yaml")),
+		file.NewSource(file.WithPath("config.yaml")),
+		env.NewSource(env.WithStrippedPrefix("CC")),
+	)
 
 }

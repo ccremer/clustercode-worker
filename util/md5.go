@@ -1,31 +1,31 @@
 package util
 
 import (
-    "crypto/md5"
-    "encoding/hex"
-    "io"
-    "os"
+	"crypto/md5"
+	"encoding/hex"
+	"io"
+	"os"
 )
 
 func CalculateMD5Hash(filePath string) (string, error) {
 
-    file, err := os.Open(filePath)
-    if err != nil {
-        return "", err
-    }
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
 
-    defer file.Close()
+	defer file.Close()
 
-    hash := md5.New()
+	hash := md5.New()
 
-    //Copy the file in the hash interface and check for any error
-    if _, err := io.Copy(hash, file); err != nil {
-        return "", err
-    }
+	//Copy the file in the hash interface and check for any error
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
 
-    //Get the 16 bytes hash
-    hashInBytes := hash.Sum(nil)[:16]
+	//Get the 16 bytes hash
+	hashInBytes := hash.Sum(nil)[:16]
 
-    return hex.EncodeToString(hashInBytes), nil
+	return hex.EncodeToString(hashInBytes), nil
 
 }

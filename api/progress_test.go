@@ -1,13 +1,13 @@
 package api
 
 import (
-    "github.com/bmizerany/assert"
-    "testing"
+	"github.com/bmizerany/assert"
+	"testing"
 )
 
 func TestParseProgressOutput_ShouldReturnStruct(t *testing.T) {
 
-    sample := `
+	sample := `
 frame=4998
 fps=383.4
 stream_0_0_q=28.0
@@ -22,15 +22,14 @@ progress=continue
 
 `
 
-    expected := Progress{
-        Frame: 4998,
-        FPS: 383.4,
-        Bitrate: 7.1,
-        Speed: 15.2,
-    }
+	expected := Progress{
+		Frame:   4998,
+		FPS:     383.4,
+		Bitrate: 7.1,
+		Speed:   15.2,
+	}
 
-    result := parseProgressOutput(sample)
-    assert.Equal(t, expected, result)
+	result := parseProgressOutput(sample)
+	assert.Equal(t, expected, result)
 
 }
-
