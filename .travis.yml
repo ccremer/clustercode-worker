@@ -16,26 +16,16 @@ env:
     - GOOS=linux GOARCH=arm   DOCKER_ARCH=armhf-edge DOCKER_TAG=armhf
     - GOOS=linux GOARCH=arm64 DOCKER_ARCH=arm64-edge DOCKER_TAG=arm64
 
-stages:
-- name: unit test
-- name: docker build
-  if: (type == pull_request)
-  # if: (branch = master) AND (type != pull_request)
-- name: docker release
-  if: (tag IS present) OR (branch =~ /^((origin\/)?master|(origin\/)?release-\d+\.\d+)$/)
+install: go mod download
 
-jobs:
-  include:
-  - stage: unit test
-    script: go test ./...
+script:
+- go test ./...
+- go build
 
-  - stage: docker build
-    script: .travis/docker-build.sh
-
-  - stage: docker release
-    script: .travis/docker-build.sh
-    deploy:
-    - provider: script
-      script: .travis/docker-release.sh
-      #on:
-      #  all_branches: true
+deploy:
+- provider: script
+  script: .travis/docker-build.sh && .travis/docker-release.sh
+  on:
+    tags: true
+    all_branches: true
+    condition: "$TRAVIS_BRANCH =~ /^((origin\\/)?master|(origin\\/)?release-\\d+\\.\\d+)$/"
