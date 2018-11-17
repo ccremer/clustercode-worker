@@ -27,5 +27,8 @@ deploy:
 - provider: script
   script: .travis/docker-release.sh
   on:
-    all_branches: true
-    condition: "branch IN release-2.0, master"
+    branch: master
+- provider: script
+  script: .travis/docker-release.sh
+  on:
+    branch: release-2.0
