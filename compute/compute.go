@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ccremer/clustercode-worker/api"
 	"github.com/ccremer/clustercode-worker/messaging"
 	"github.com/ccremer/clustercode-worker/process"
 	"github.com/go-cmd/cmd"
@@ -44,10 +45,11 @@ func handleSliceAddedEvent(slice messaging.SliceAddedEvent) {
 	var count = 1
 	for backoff.Continue(b) {
 		log.Infof("Processing slice: %s, %d", slice.JobID, slice.SliceNr)
-		ffmpeg := process.StartProcess(slice.Args)
+		ffmpeg := process.StartProcess(append(slice.Args, api.GetExtraArgsForProgress()[:]...))
 		go process.PrintOutputLines(ffmpeg)
 		go listenForCancelMessage(ffmpeg, &slice)
 		err := waitForProcessToFinish(ffmpeg, &slice)
+		api.ResetProgressMetrics()
 		if err == nil {
 			return
 		} else {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"github.com/ccremer/clustercode-worker/util"
 	"github.com/micro/go-config"
 	"math"
@@ -20,6 +21,12 @@ type (
 	}
 )
 
+var (
+	// original: \s*(\d+\.?\d*).*
+	re        = regexp.MustCompile("\\s*(\\d+\\.?\\d*).*")
+	extraArgs []string
+)
+
 func openUnixSocket() {
 
 	path := config.Get("api", "ffmpeg", "unix").String("/tmp/ffmpeg.sock")
@@ -29,20 +36,23 @@ func openUnixSocket() {
 	if err != nil {
 		util.PanicOnError(err)
 	}
-
-	for {
-		fd, err := l.Accept()
-		if err != nil {
-			util.PanicOnError(err)
+	extraArgs = []string{"-progress", fmt.Sprintf("unix://%s", path)}
+	go func() {
+		for {
+			fd, err := l.Accept()
+			if err != nil {
+				util.PanicOnError(err)
+			}
+			go readSocket(fd)
 		}
-		go readSocket(fd)
-	}
+	}()
 }
 
-// original: \s*(\d+\.?\d*).*
-var re = regexp.MustCompile("\\s*(\\d+\\.?\\d*).*")
+func GetExtraArgsForProgress() []string {
+	return extraArgs
+}
 
-func parseProgressOutput(out string) Progress {
+func parseProgressOutput(out string) {
 	fields := make(map[string]string)
 	for _, line := range strings.Split(out, "\n") {
 		fragments := strings.Split(line, "=")
@@ -59,11 +69,15 @@ func parseProgressOutput(out string) Progress {
 	speedRaw := fields["speed"]
 	speed, _ := strconv.ParseFloat(speedRaw[0:len(speedRaw)-1], 32)
 
-	return Progress{
-		Frame:   frame,
-		FPS:     math.Round(fps*100) / 100,
-		Bitrate: math.Round(bitrate*100) / 100,
-		Speed:   math.Round(speed*100) / 100,
+	if fields["progress"] == "end" {
+		ResetProgressMetrics()
+	} else {
+		MetricsChan <- Progress{
+			Frame:   frame,
+			FPS:     math.Round(fps*100) / 100,
+			Bitrate: math.Round(bitrate*100) / 100,
+			Speed:   math.Round(speed*100) / 100,
+		}
 	}
 }
 
@@ -76,6 +90,6 @@ func readSocket(c net.Conn) {
 		}
 
 		data := buf[0:nr]
-		log.Infof("%v", parseProgressOutput(string(data)))
+		parseProgressOutput(string(data))
 	}
 }

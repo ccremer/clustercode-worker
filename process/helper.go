@@ -4,6 +4,7 @@ import (
 	_ "github.com/aellwein/slf4go-native-adaptor"
 	"github.com/ccremer/clustercode-worker/util"
 	"github.com/go-cmd/cmd"
+	"github.com/micro/go-config"
 	"os/exec"
 	"time"
 )
@@ -15,7 +16,9 @@ func StartProcess(args []string) *cmd.Cmd {
 		Buffered:  false,
 		Streaming: true,
 	}
-	ffmpeg := cmd.NewCmdOptions(cmdOptions, path, replaceFields(args)[:]...)
+	extraArgs := config.Get("api", "ffmpeg", "defaultargs").StringSlice([]string{"-y", "-hide_banner"})
+
+	ffmpeg := cmd.NewCmdOptions(cmdOptions, path, replaceFields(append(args, extraArgs[:]...))[:]...)
 	log.Infof("Starting process: %s", ffmpeg.Args)
 	ffmpeg.Start()
 	return ffmpeg

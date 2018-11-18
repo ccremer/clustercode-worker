@@ -29,7 +29,7 @@ progress=continue
 		Speed:   15.2,
 	}
 
-	result := parseProgressOutput(sample)
-	assert.Equal(t, expected, result)
+	parseProgressOutput(sample)
+	assert.Equal(t, expected, <-MetricsChan)
 
 }

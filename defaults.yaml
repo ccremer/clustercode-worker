@@ -19,6 +19,10 @@ api:
   http:
     port: 8080
   ffmpeg:
+    defaultargs:
+    - '-y'
+    - '-hide_banner'
+    - '-nostats'
     protocol: unix
     unix: /tmp/ffmpeg.sock
 

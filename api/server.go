@@ -5,6 +5,7 @@ import (
 	"github.com/aellwein/slf4go"
 	"github.com/ccremer/clustercode-worker/util"
 	"github.com/micro/go-config"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"strings"
 )
@@ -21,6 +22,7 @@ func StartServer() {
 	log.Infof("Starting http server on port %s", port)
 	http.HandleFunc("/", handleRoot)
 	http.HandleFunc("/health", handleHealth)
+	http.Handle("/metrics", promhttp.Handler())
 	go func() {
 		err := http.ListenAndServe(":"+port, nil)
 		util.PanicOnError(err)

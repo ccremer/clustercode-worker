@@ -9,8 +9,6 @@ channel.queue_declare(queue='slice-added', durable=True)
 
 message = json.dumps({
     "args": [
-        "-hide_banner",
-        "-y",
         "-t", "200",
         "-s", "640x480",
         "-f", "rawvideo",
@@ -18,8 +16,6 @@ message = json.dumps({
         "-r", "25",
         "-i", "/dev/zero",
         "${output_dir}/empty.mp4",
-        "-progress",
-        "unix:///tmp/ffmpeg.sock"
     ],
     "file": "vendor/empty.mpeg", "job_id": "asdf"
 })
