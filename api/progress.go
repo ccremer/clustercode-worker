@@ -52,7 +52,7 @@ func GetExtraArgsForProgress() []string {
 	return extraArgs
 }
 
-func parseProgressOutput(out string) {
+func parseProgressOutput(out string) (Progress) {
 	fields := make(map[string]string)
 	for _, line := range strings.Split(out, "\n") {
 		fragments := strings.Split(line, "=")
@@ -70,14 +70,15 @@ func parseProgressOutput(out string) {
 	speed, _ := strconv.ParseFloat(speedRaw[0:len(speedRaw)-1], 32)
 
 	if fields["progress"] == "end" {
-		ResetProgressMetrics()
+		return Progress{}
 	} else {
-		MetricsChan <- Progress{
+		result := Progress{
 			Frame:   frame,
 			FPS:     math.Round(fps*100) / 100,
 			Bitrate: math.Round(bitrate*100) / 100,
 			Speed:   math.Round(speed*100) / 100,
 		}
+		return result
 	}
 }
 
@@ -90,6 +91,6 @@ func readSocket(c net.Conn) {
 		}
 
 		data := buf[0:nr]
-		parseProgressOutput(string(data))
+		metricsChan <- parseProgressOutput(string(data))
 	}
 }

@@ -1,3 +1,3 @@
 #!/bin/sh
 
-exec ./clustercode-worker
+exec ./clustercode-worker $@

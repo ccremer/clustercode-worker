@@ -19,7 +19,7 @@ env:
 install: go mod download
 
 script:
-- go test ./...
+- go test ./... -short
 - go build
 - .travis/docker-build.sh
 

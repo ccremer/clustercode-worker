@@ -37,6 +37,17 @@ func PrintOutputLines(cmd *cmd.Cmd) {
 	}
 }
 
+func CaptureOutputLines(cmd *cmd.Cmd, stdOutCallback func(*string), stdErrCallback func(*string)) {
+	for {
+		select {
+		case line := <-cmd.Stdout:
+			stdOutCallback(&line)
+		case line := <-cmd.Stderr:
+			stdErrCallback(&line)
+		}
+	}
+}
+
 func WaitForOutput(ffmpeg *cmd.Cmd) {
 	for len(ffmpeg.Stdout) > 0 || len(ffmpeg.Stderr) > 0 {
 		time.Sleep(10 * time.Millisecond)

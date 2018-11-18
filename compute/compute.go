@@ -10,16 +10,15 @@ import (
 	"github.com/go-cmd/cmd"
 	"github.com/lestrrat-go/backoff"
 	"os"
+	"sync/atomic"
 	"time"
 )
 
-var sliceCompleteChan chan messaging.SliceCompletedEvent
-var taskCancelledChan chan messaging.TaskCancelledEvent
+var sliceCompleteChan = make(chan messaging.SliceCompletedEvent)
+var taskCancelledChan = make(chan messaging.TaskCancelledEvent)
+var linePrintedChan = make(chan messaging.FfmpegLinePrintedEvent)
 
 func Start() {
-
-	sliceCompleteChan = make(chan messaging.SliceCompletedEvent)
-	taskCancelledChan = make(chan messaging.TaskCancelledEvent)
 
 	messaging.OpenSliceCompleteQueue(sliceCompleteChan)
 	messaging.OpenSliceAddedQueue(handleSliceAddedEvent)
@@ -27,6 +26,8 @@ func Start() {
 
 	messaging.OpenTaskCancelledQueue(handleTaskCancelledEvent)
 	log.Infof("Listening for task cancellations.")
+
+	messaging.OpenFfmpegLinePrintedQueue(linePrintedChan)
 }
 
 const maxRetries = 9
@@ -46,7 +47,9 @@ func handleSliceAddedEvent(slice messaging.SliceAddedEvent) {
 	for backoff.Continue(b) {
 		log.Infof("Processing slice: %s, %d", slice.JobID, slice.SliceNr)
 		ffmpeg := process.StartProcess(append(slice.Args, api.GetExtraArgsForProgress()[:]...))
-		go process.PrintOutputLines(ffmpeg)
+		if slice.SliceNr == 0 {
+			handleOutput(ffmpeg, &slice)
+		}
 		go listenForCancelMessage(ffmpeg, &slice)
 		err := waitForProcessToFinish(ffmpeg, &slice)
 		api.ResetProgressMetrics()
@@ -62,9 +65,33 @@ func handleSliceAddedEvent(slice messaging.SliceAddedEvent) {
 	os.Exit(2)
 }
 
+func handleOutput(ffmpeg *cmd.Cmd, slice *messaging.SliceAddedEvent) {
+	var counter int64 = 0
+	go process.CaptureOutputLines(ffmpeg,
+		func(stdOutLine *string) {
+			linePrintedChan <- messaging.FfmpegLinePrintedEvent{
+				SliceNr: slice.SliceNr,
+				JobID:   slice.JobID,
+				FD:      messaging.StdOutFileDescriptor,
+				Line:    *stdOutLine,
+				Index:   atomic.AddInt64(&counter, 1),
+			}
+		}, func(stdErrLine *string) {
+			linePrintedChan <- messaging.FfmpegLinePrintedEvent{
+				SliceNr: slice.SliceNr,
+				JobID:   slice.JobID,
+				FD:      messaging.StdErrFileDescriptor,
+				Line:    *stdErrLine,
+				Index:   atomic.AddInt64(&counter, 1),
+			}
+		})
+}
+
 func waitForProcessToFinish(ffmpeg *cmd.Cmd, slice *messaging.SliceAddedEvent) error {
 	status := <-ffmpeg.Start()
-	process.WaitForOutput(ffmpeg)
+	if slice.SliceNr == 0 {
+		process.WaitForOutput(ffmpeg)
+	}
 	if status.Error != nil || status.Exit > 0 {
 		if status.Exit < 255 {
 			slice.SetComplete(messaging.IncompleteAndRequeue)

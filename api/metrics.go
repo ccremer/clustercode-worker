@@ -21,7 +21,7 @@ var (
 		Name: "clustercode_compute_fps",
 		Help: "Current frames per second of a the slice.",
 	})
-	MetricsChan = make(chan Progress)
+	metricsChan = make(chan Progress, 2)
 )
 
 func init() {
@@ -33,8 +33,10 @@ func init() {
 	go func() {
 		for {
 			select {
-			case p := <-MetricsChan:
+			case p := <-metricsChan:
 				SetProgressMetric(p)
+			default:
+				continue
 			}
 		}
 	}()
@@ -48,5 +50,5 @@ func SetProgressMetric(p Progress) {
 }
 
 func ResetProgressMetrics() {
-	MetricsChan <- Progress{}
+	metricsChan <- Progress{}
 }

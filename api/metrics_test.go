@@ -13,6 +13,10 @@ import (
 
 func TestSetProgressMetric_ShouldUpdateMetrics(t *testing.T) {
 
+	if testing.Short() {
+		t.Skipf("Skipping integration test")
+	}
+
 	util.LoadConfig()
 
 	StartServer()

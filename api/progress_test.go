@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/bmizerany/assert"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -29,7 +29,7 @@ progress=continue
 		Speed:   15.2,
 	}
 
-	parseProgressOutput(sample)
-	assert.Equal(t, expected, <-MetricsChan)
+	result := parseProgressOutput(sample)
+	assert.Equal(t, expected, result)
 
 }

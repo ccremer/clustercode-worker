@@ -9,6 +9,9 @@ const (
 	Complete             CompletionType = 0
 	Incomplete           CompletionType = 1
 	IncompleteAndRequeue CompletionType = 2
+	StdInFileDescriptor                 = 0
+	StdOutFileDescriptor                = 1
+	StdErrFileDescriptor                = 2
 )
 
 type (
@@ -40,6 +43,13 @@ type (
 		FileHash string `json:"file_hash"`
 		SliceNr  int    `json:"slice_nr"`
 	}
+	FfmpegLinePrintedEvent struct {
+		JobID   string `json:"job_id"`
+		SliceNr int    `json:"slice_nr"`
+		FD      int    `json:"fd"`
+		Line    string `json:"line"`
+		Index   int64  `json:"index"`
+	}
 )
 
 func fromJson(json string, value interface{}) error {
@@ -55,4 +65,16 @@ func ToJson(value interface{}) (string, error) {
 	} else {
 		return "", err
 	}
+}
+
+func (e TaskCancelledEvent) SetComplete(completionType CompletionType) {
+	acknowledgeMessage(completionType, e.delivery)
+}
+
+func (e SliceAddedEvent) SetComplete(completionType CompletionType) {
+	acknowledgeMessage(completionType, e.delivery)
+}
+
+func (e TaskAddedEvent) SetComplete(completionType CompletionType) {
+	acknowledgeMessage(completionType, e.delivery)
 }

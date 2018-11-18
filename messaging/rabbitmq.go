@@ -15,6 +15,8 @@ type (
 		autoDelete   bool
 		noWait       bool
 		internal     bool
+		mandatory    bool
+		immediate    bool
 		routingKey   string
 		exchangeName string
 		exchangeType string
@@ -37,6 +39,8 @@ func newQueueOptions() queueOptions {
 		autoDelete:   false,
 		noWait:       false,
 		autoAck:      false,
+		mandatory:    false,
+		immediate:    false,
 		queueName:    "",
 		args:         nil,
 		routingKey:   "",
@@ -105,25 +109,16 @@ func OpenSliceCompleteQueue(supplier chan SliceCompletedEvent) {
 	options.queueName = config.Get("rabbitmq", "channels", "slice", "completed").String("slice-completed")
 	channel := createChannel()
 	q := createQueue(&options, channel)
-	exchange, mandatory, immediate := "", false, false
+	options.queueName = q.Name
 
-	go func(channel *amqp.Channel) {
+	go func(channel *amqp.Channel, options *queueOptions) {
 		for {
 			msg := <-supplier
 			json, _ := ToJson(msg)
-			channel.Publish(
-				exchange,
-				q.Name,
-				mandatory,
-				immediate,
-				amqp.Publishing{
-					DeliveryMode: amqp.Persistent,
-					ContentType:  "application/json",
-					Body:         []byte(json),
-				})
+			publish(options, channel, json)
 			log.Debugf("Sent message to queue %s: %s", q.Name, json)
 		}
-	}(channel)
+	}(channel, &options)
 }
 
 func OpenTaskCompleteQueue(supplier chan TaskCompletedEvent) {
@@ -131,26 +126,17 @@ func OpenTaskCompleteQueue(supplier chan TaskCompletedEvent) {
 	options.queueName = config.Get("rabbitmq", "channels", "task", "completed").String("task-completed")
 	channel := createChannel()
 	q := createQueue(&options, channel)
-	exchange, mandatory, immediate := "", false, false
-
-	go func(channel *amqp.Channel) {
+	options.queueName = q.Name
+	go func(channel *amqp.Channel, options *queueOptions) {
 		for {
 			msg := <-supplier
 			json, _ := ToJson(msg)
-			channel.Publish(
-				exchange,
-				q.Name,
-				mandatory,
-				immediate,
-				amqp.Publishing{
-					DeliveryMode: amqp.Persistent,
-					ContentType:  "application/json",
-					Body:         []byte(json),
-				})
+			publish(options, channel, json)
 			log.Debugf("Sent message to queue %s: %s", q.Name, json)
 		}
-	}(channel)
+	}(channel, &options)
 }
+
 func OpenTaskCancelledQueue(callback func(msg TaskCancelledEvent)) {
 	channel := createChannel()
 	options := newQueueOptions()
@@ -179,115 +165,17 @@ func OpenTaskCancelledQueue(callback func(msg TaskCancelledEvent)) {
 	})
 }
 
-func failOnDeserialize(err error) {
-	util.PanicOnErrorf("Could not deserialize message: %s. Please purge the invalid messages.", err)
-}
-
-func createChannel() *amqp.Channel {
-	log.Debugf("Opening a new channel.")
-	channel, err := connection.Channel()
-	util.PanicOnErrorf("Failed to open channel: %[1]s", err)
-	return channel
-}
-
-func createQueue(o *queueOptions, channel *amqp.Channel) amqp.Queue {
-	log.Debugf("Creating queue %s", o.queueName)
-	q, err := channel.QueueDeclare(
-		o.queueName,
-		o.durable,
-		o.autoDelete,
-		o.exclusive,
-		o.noWait,
-		o.args,
-	)
-	util.PanicOnErrorf("Failed to declare queue %[2]s: %[1]s", err, o.queueName)
-	return q
-}
-
-func createExchange(o *queueOptions, channel *amqp.Channel) {
-	log.Debugf("Creating exchange %s", o.exchangeName)
-	err := channel.ExchangeDeclare(
-		o.exchangeName,
-		o.exchangeType,
-		o.durable,
-		o.autoDelete,
-		o.internal,
-		o.noWait,
-		o.args)
-	util.PanicOnErrorf("Failed to create exchange %[2]s: %[1]s", err, o.exchangeName)
-}
-
-func bindToExchange(o *queueOptions, channel *amqp.Channel) {
-	log.Debugf("Binding queue %s to exchange %s", o.queueName, o.exchangeName)
-	err := channel.QueueBind(
-		o.queueName,
-		o.routingKey,
-		o.exchangeName,
-		o.noWait,
-		o.args)
-	util.PanicOnErrorf("Failed to bind queue %[2]s: %[1]s", err, o.queueName)
-}
-
-func createConsumer(o *queueOptions, channel *amqp.Channel) <-chan amqp.Delivery {
-	msgs, err := channel.Consume(
-		o.queueName,
-		o.consumerName,
-		o.autoAck,
-		o.exclusive,
-		o.noLocal,
-		o.noWait,
-		o.args,
-	)
-	util.PanicOnErrorf("Failed to consume queue: %[2]s: %[1]s", err, o.queueName)
-	return msgs
-}
-
-func ensureOnlyOneConsumerActive(channel *amqp.Channel) {
-	prefetchCount, prefetchSize, global := 1, 0, false
-	err := channel.Qos(
-		prefetchCount,
-		prefetchSize,
-		global,
-	)
-	util.PanicOnErrorf("Failed to set QoS: %s", err)
-}
-
-func beginConsuming(msgs <-chan amqp.Delivery, callback messageReceivedCallback) {
-	go func(msgs <-chan amqp.Delivery) {
-		for msg := range msgs {
-			log.Debugf("Received a message: %s", msg.Body)
-			callback(&msg)
+func OpenFfmpegLinePrintedQueue(supplier chan FfmpegLinePrintedEvent) {
+	options := newQueueOptions()
+	options.queueName = config.Get("rabbitmq", "channels", "out").String("line-out")
+	channel := createChannel()
+	q := createQueue(&options, channel)
+	options.queueName = q.Name
+	go func(channel *amqp.Channel, options *queueOptions) {
+		for {
+			msg := <-supplier
+			json, _ := ToJson(msg)
+			publish(options, channel, json)
 		}
-	}(msgs)
-}
-
-func (e TaskCancelledEvent) SetComplete(completionType CompletionType) {
-	acknowledgeMessage(completionType, e.delivery)
-}
-
-func (e SliceAddedEvent) SetComplete(completionType CompletionType) {
-	acknowledgeMessage(completionType, e.delivery)
-}
-
-func (e TaskAddedEvent) SetComplete(completionType CompletionType) {
-	acknowledgeMessage(completionType, e.delivery)
-}
-
-func acknowledgeMessage(completionType CompletionType, delivery *amqp.Delivery) {
-	switch completionType {
-	case Complete:
-		{
-			delivery.Ack(false)
-		}
-	case Incomplete:
-		{
-			delivery.Nack(false, false)
-		}
-	case IncompleteAndRequeue:
-		{
-			delivery.Nack(false, true)
-		}
-	default:
-		panic("This type is not expected here. This is a Programmer error!")
-	}
+	}(channel, &options)
 }
