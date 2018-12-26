@@ -4,7 +4,10 @@ Worker microservice for clustercode [WIP]
 
 ## Building
 
+    sudo snap install go --classic # or whatever package manager you use
+    sudo apt-get install g++
     go mod vendor
+    go build
 
 ## Running
 

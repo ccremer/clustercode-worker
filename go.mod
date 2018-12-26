@@ -7,7 +7,7 @@ require (
 	github.com/aellwein/slf4go-native-adaptor v0.0.0-20180904194845-eb00a06668ec
 	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 // indirect
 	github.com/bitly/go-simplejson v0.5.0 // indirect
-	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869
+	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/bouk/monkey v1.0.1 // indirect
 	github.com/cenkalti/backoff v2.0.0+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.4.7 // indirect
