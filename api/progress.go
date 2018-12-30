@@ -69,6 +69,8 @@ func parseProgressOutput(out string) (Progress) {
 	speedRaw := fields["speed"]
 	speed, _ := strconv.ParseFloat(speedRaw[0:len(speedRaw)-1], 32)
 
+	return Progress{}
+
 	if fields["progress"] == "end" {
 		return Progress{}
 	} else {
