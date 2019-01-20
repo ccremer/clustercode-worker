@@ -1,17 +1,16 @@
 package process
 
 import (
-	_ "github.com/aellwein/slf4go-native-adaptor"
-	"github.com/ccremer/clustercode-worker/util"
 	"github.com/go-cmd/cmd"
 	"github.com/micro/go-config"
+	log "github.com/sirupsen/logrus"
 	"os/exec"
 	"time"
 )
 
 func StartProcess(args []string) *cmd.Cmd {
 	path, err := exec.LookPath("ffmpeg")
-	util.PanicOnError(err)
+	log.Fatal(err)
 	cmdOptions := cmd.Options{
 		Buffered:  false,
 		Streaming: true,

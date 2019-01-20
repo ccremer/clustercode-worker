@@ -2,8 +2,9 @@ package api
 
 import (
 	"fmt"
-	"github.com/ccremer/clustercode-worker/messaging"
+	"github.com/ccremer/clustercode-api-gateway/entities"
 	"github.com/micro/go-config"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 )
@@ -35,7 +36,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 	}
 
-	json, _ := messaging.ToJson(dto)
+	json, _ := entities.ToJson(dto)
 	fmt.Fprint(w, json)
 
 	log.Debugf("response: %s", json)

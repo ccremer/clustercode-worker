@@ -1,21 +1,22 @@
 package shovel
 
 import (
-	"github.com/ccremer/clustercode-worker/messaging"
+	"github.com/ccremer/clustercode-api-gateway/entities"
 	"github.com/ccremer/clustercode-worker/process"
+	log "github.com/sirupsen/logrus"
 )
 
-var taskCompleteChan chan messaging.TaskCompletedEvent
+var taskCompleteChan chan entities.TaskCompletedEvent
 
 func Start() {
-	taskCompleteChan = make(chan messaging.TaskCompletedEvent)
+	taskCompleteChan = make(chan entities.TaskCompletedEvent)
 
-	messaging.OpenTaskCompleteQueue(taskCompleteChan)
-	messaging.OpenTaskAddedQueue(handleTaskAddedEvent)
+	//entities.OpenTaskCompleteQueue(taskCompleteChan)
+	//entities.OpenTaskAddedQueue(handleTaskAddedEvent)
 	log.Infof("Listing for task added events.")
 }
 
-func handleTaskAddedEvent(task messaging.TaskAddedEvent) {
+func handleTaskAddedEvent(task entities.TaskAddedEvent) {
 	log.Infof("Processing task: %s", task.JobID)
 	ffmpeg := process.StartProcess(task.Args)
 	go process.PrintOutputLines(ffmpeg)
@@ -24,16 +25,16 @@ func handleTaskAddedEvent(task messaging.TaskAddedEvent) {
 	log.Debugf("Process finished with exit code %d.", status.Exit)
 	if status.Error != nil || status.Exit > 0 {
 		log.Infof("Task failed.")
-		task.SetComplete(messaging.IncompleteAndRequeue)
+		task.SetComplete(entities.IncompleteAndRequeue)
 	} else {
 		log.Infof("Task finished.")
-		task.SetComplete(messaging.Complete)
+		task.SetComplete(entities.Complete)
 		sendTaskCompletedMessage(&task)
 	}
 }
 
-func sendTaskCompletedMessage(slice *messaging.TaskAddedEvent) {
-	taskCompleteChan <- messaging.TaskCompletedEvent{
+func sendTaskCompletedMessage(slice *entities.TaskAddedEvent) {
+	taskCompleteChan <- entities.TaskCompletedEvent{
 		JobID: slice.JobID,
 	}
 }

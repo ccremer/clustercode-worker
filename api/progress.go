@@ -2,8 +2,8 @@ package api
 
 import (
 	"fmt"
-	"github.com/ccremer/clustercode-worker/util"
 	"github.com/micro/go-config"
+	log "github.com/sirupsen/logrus"
 	"math"
 	"net"
 	"os"
@@ -34,14 +34,14 @@ func openUnixSocket() {
 	os.Remove(path)
 	l, err := net.Listen("unix", path)
 	if err != nil {
-		util.PanicOnError(err)
+		log.Fatal(err)
 	}
 	extraArgs = []string{"-progress", fmt.Sprintf("unix://%s", path)}
 	go func() {
 		for {
 			fd, err := l.Accept()
 			if err != nil {
-				util.PanicOnError(err)
+				log.Panic(err)
 			}
 			go readSocket(fd)
 		}
@@ -68,8 +68,6 @@ func parseProgressOutput(out string) (Progress) {
 
 	speedRaw := fields["speed"]
 	speed, _ := strconv.ParseFloat(speedRaw[0:len(speedRaw)-1], 32)
-
-	return Progress{}
 
 	if fields["progress"] == "end" {
 		return Progress{}

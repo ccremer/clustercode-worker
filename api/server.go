@@ -2,19 +2,12 @@ package api
 
 import (
 	"fmt"
-	"github.com/aellwein/slf4go"
-	"github.com/ccremer/clustercode-worker/util"
 	"github.com/micro/go-config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
 )
-
-var log = slf4go.GetLogger("httpapi")
-
-func Init() {
-	log.SetLevel(util.StringToLogLevel(config.Get("log", "level").String("info")))
-}
 
 func StartServer() {
 
@@ -25,7 +18,7 @@ func StartServer() {
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
 		err := http.ListenAndServe(":"+port, nil)
-		util.PanicOnError(err)
+		log.Fatal(err)
 	}()
 
 	ffmpegProtocol := strings.ToLower(config.Get("api", "ffmpeg", "protocol").String("unix"))
@@ -33,7 +26,7 @@ func StartServer() {
 	case "unix":
 		openUnixSocket()
 	default:
-		util.PanicWithMessage("Protocol %s is not supported!", ffmpegProtocol)
+		log.WithField("protocol", ffmpegProtocol).Fatal("protocol is not supported")
 	}
 
 }
