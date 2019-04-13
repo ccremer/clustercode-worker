@@ -2,103 +2,56 @@ package main
 
 import (
 	"fmt"
-	"github.com/ccremer/clustercode-api-gateway/entities"
-	"github.com/ccremer/clustercode-api-gateway/messaging"
-	"github.com/ccremer/clustercode-api-gateway/schema"
 	"github.com/ccremer/clustercode-worker/api"
 	"github.com/ccremer/clustercode-worker/compute"
+	"github.com/ccremer/clustercode-worker/config"
+	"github.com/ccremer/clustercode-worker/entities"
+	"github.com/ccremer/clustercode-worker/messaging"
+	"github.com/ccremer/clustercode-worker/schema"
 	"github.com/ccremer/clustercode-worker/shovel"
-	"github.com/micro/go-config"
 	log "github.com/sirupsen/logrus"
-	flag "github.com/spf13/pflag"
-	"github.com/spf13/viper"
-	"os"
 )
 
+var Version string
+var Commit string
+
 func main() {
-	fmt.Println("started!")
-
-	SetupFlags()
-	entities.Validator = &schema.Validator{}
-	entities.Validator.LoadXmlSchema("../clustercode-api-gateway/schema/clustercode_v1.xsd")
-	displayHelp := flag.Bool("help", false, "Displays help text and exits")
-	flag.Parse()
-	if *displayHelp {
-		flag.PrintDefaults()
-		os.Exit(0)
+	if err := config.LoadConfig(); err != nil {
+		log.
+			WithError(err).
+			WithField("help", "Be sure to NOT specify the file extension.").
+			Error("Could not load config.")
 	}
+	config.ConfigureLogging()
 
-	log.Infof("Loading configuration...")
-	LoadConfig()
+	cfg := config.GetConfig()
 
-	service := messaging.NewRabbitMqService("amqp://guest:guest@localhost:5672/")
+	service := messaging.NewRabbitMqService(cfg.RabbitMq.Url)
 	service.Start()
+	entities.Validator = schema.NewXmlValidator(cfg.Api.Schema.Path)
 
 	computeRole := "compute"
 	shovelRole := "shovel"
-	role := config.Get("role").String("compute")
+	role := cfg.Role
 	if role == computeRole {
-		log.Infof("Enable role: %s", computeRole)
-		compute.Start(service)
+		compute.NewComputeInstance(service)
 	} else if role == shovelRole {
-		log.Infof("Enable role: %s", shovelRole)
-		shovel.Start()
+		shovel.NewInstance(service)
 	} else {
 		log.WithFields(log.Fields{
-			"variable": "CC_ROLE",
-			"allowed":  []string{computeRole, shovelRole},
-		}).Fatal("role specification of this worker is required")
+			"variable": "role",
+			"help": fmt.Sprintf("Specify the role either in CC_ROLE, by providing the CLI flag --role, "+
+				"or in a config file. Allowed values: %s", []string{computeRole, shovelRole}),
+		}).Fatal("Correct role specification of this worker is required.")
 	}
 
-	api.StartServer()
+	api.StartHttpServer(service)
 
 	forever := make(chan bool)
-	log.Infof("Startup complete")
+	log.WithFields(log.Fields{
+		"version": Version,
+		"commit": Commit,
+		"role":    role,
+	}).Info("Startup complete.")
 	<-forever
-}
-
-func SetupFlags() map[string]interface{} {
-	m := make(map[string]interface{})
-
-	m["log.level"] = *flag.StringP("log-level", "l", "info", "Log level")
-	return m
-}
-
-func LoadConfig() {
-	viper.Debug()
-	viper.SetConfigName("clustercode")
-	viper.AddConfigPath(".")
-	//viper.AddConfigPath("")
-	//viper.G
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatal(err)
-	}
-	v := viper.GetViper()
-	fmt.Println(v)
-	//v.M
-}
-
-func ConfigureLogging() {
-	key := "log"
-	disableTimestamps := !config.Get(key, "timestamps").Bool(false)
-	formatter := config.Get(key, "formatter").String("json")
-	switch formatter {
-	case "json":
-		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: disableTimestamps})
-	case "text":
-		log.SetFormatter(&log.TextFormatter{DisableTimestamp: disableTimestamps, FullTimestamp: true})
-	default:
-		log.Warnf("Log formatter '%s' is not supported. Using default", formatter)
-	}
-
-	log.SetOutput(os.Stdout)
-	log.SetReportCaller(config.Get(key, "caller").Bool(false))
-
-	level, err := log.ParseLevel(config.Get(key, "level").String("info"))
-	if err != nil {
-		log.Warnf("%s. Using info.", err)
-		log.SetLevel(log.InfoLevel)
-	} else {
-		log.SetLevel(level)
-	}
 }

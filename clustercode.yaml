@@ -1,62 +1,70 @@
 ---
-role: compute
+## You need to specify the role of this worker. Allowed is either: compute, shovel.
+#role: compute
 
 log:
   level: info
-  timestamps: false
-  formatter: json
-  caller: false
+  ## If your logging stack does not already have timestamps, enable them here.
+  # timestamps: false
+  ## If you have ELK/EFK stack running, you might want to use the json format for easier filtering.
+  # formatter: text
+  ## For debugging: Enable logging the caller function names
+  # caller: false
 
 rabbitmq:
   url: amqp://guest:guest@rabbitmq:5672/
-  channels:
-    task:
-      added:
-        queue:
-          queueName: task-added
-          durable: true
-        qos:
-          prefetchCount: 1
-      completed:
-        queue:
-          queueName: task-completed
-          durable: true
-      cancelled:
-        queue:
-          exclusive: true
-        exchange:
-          exchangeName: task-cancelled
-          durable: true
-    slice:
-      added:
-        queue:
-          queueName: slice-added
-          durable: true
-        qos:
-          prefetchCount: 1
-      completed:
-        queue:
-          queueName: slice-completed
-          durable: true
-
-api:
-  http:
-    port: 8080
-  ffmpeg:
-    defaultargs:
-      - '-y'
-      - '-hide_banner'
-      - '-nostats'
-    protocol: unix
-    unix: /tmp/ffmpeg.sock
-
-input:
-  dir: /input
-
-output:
-  dir: /output
-  tmpdir: /clustercode
-
-prometheus:
-  enabled: true
-  uri: /metrics
+## The following should already be sensible default values:
+#  channels:
+#    task:
+#      added:
+#        queue:
+#          queueName: task-added
+#          durable: true
+#        qos:
+#          prefetchCount: 1
+#      completed:
+#        queue:
+#          queueName: task-completed
+#          durable: true
+#      cancelled:
+#        queue:
+#          exclusive: true
+#        exchange:
+#          exchangeName: task-cancelled
+#          durable: true
+#    slice:
+#      added:
+#        queue:
+#          queueName: slice-added
+#          durable: true
+#        qos:
+#          prefetchCount: 1
+#      completed:
+#        queue:
+#          queueName: slice-completed
+#          durable: true
+#
+#api:
+#  http:
+#    address: ':8080'
+#    readyUri: /.well-known/ready
+#    healthUri: /.well-known/health
+#  ffmpeg:
+#    defaultargs:
+#      - '-y'
+#      - '-hide_banner'
+#      - '-nostats'
+#    protocol: unix
+#    unix: /tmp/ffmpeg.sock
+#
+#input:
+#  dir: /input
+#
+#output:
+#  dir: /output
+#  tmpdir: /clustercode
+#
+#prometheus:
+## The exporter is running on the same port as api.http.address
+#  enabled: true
+#  uri: /.well-known/metrics

@@ -1,40 +1,60 @@
 package shovel
 
 import (
-	"github.com/ccremer/clustercode-api-gateway/entities"
+	"github.com/ccremer/clustercode-worker/config"
+	"github.com/ccremer/clustercode-worker/entities"
+	"github.com/ccremer/clustercode-worker/messaging"
 	"github.com/ccremer/clustercode-worker/process"
 	log "github.com/sirupsen/logrus"
 )
 
-var taskCompleteChan chan entities.TaskCompletedEvent
+type (
+	Instance struct {
+		MessagingService   *messaging.RabbitMqService
+		config             config.ConfigMap
+		taskCompletedQueue *messaging.ChannelConfig
+	}
+)
 
-func Start() {
-	taskCompleteChan = make(chan entities.TaskCompletedEvent)
-
-	//entities.OpenTaskCompleteQueue(taskCompleteChan)
-	//entities.OpenTaskAddedQueue(handleTaskAddedEvent)
-	log.Infof("Listing for task added events.")
+func NewInstance(service *messaging.RabbitMqService) Instance {
+	instance := Instance{
+		MessagingService:   service,
+		taskCompletedQueue: getTaskCompletedQueue(),
+	}
+	service.AddChannelConfig(instance.taskCompletedQueue)
+	service.AddChannelConfig(getTaskAddedQueue(instance.handleTaskAddedEvent))
+	log.Infof("Listening for task added events.")
+	return instance
 }
 
-func handleTaskAddedEvent(task entities.TaskAddedEvent) {
-	log.Infof("Processing task: %s", task.JobID)
-	ffmpeg := process.StartProcess(task.Args)
-	go process.PrintOutputLines(ffmpeg)
-	status := <-ffmpeg.Start()
-	process.WaitForOutput(ffmpeg)
-	log.Debugf("Process finished with exit code %d.", status.Exit)
+func (i *Instance) handleTaskAddedEvent(task *entities.TaskAddedEvent) {
+	logEntry := log.WithField("task_id", task.JobID)
+	logEntry.Info("Processing task.")
+	p := process.New(task.Args, config.GetConfig())
+	p.StartProcess()
+	go p.PrintOutputLines()
+	status := <-p.Cmd.Start()
+	p.WaitForOutput()
+	logEntry = logEntry.WithField("exit_code", status.Exit)
 	if status.Error != nil || status.Exit > 0 {
-		log.Infof("Task failed.")
+		logEntry.Info("Task failed.")
 		task.SetComplete(entities.IncompleteAndRequeue)
 	} else {
-		log.Infof("Task finished.")
+		logEntry.Info("Task finished.")
 		task.SetComplete(entities.Complete)
-		sendTaskCompletedMessage(&task)
+		i.sendTaskCompletedMessage(task)
 	}
 }
 
-func sendTaskCompletedMessage(slice *entities.TaskAddedEvent) {
-	taskCompleteChan <- entities.TaskCompletedEvent{
-		JobID: slice.JobID,
+func (i *Instance) sendTaskCompletedMessage(task *entities.TaskAddedEvent) {
+	payload, err := entities.ToXml(entities.TaskCompletedEvent{
+		JobID: task.JobID,
+	})
+	if err == nil {
+		i.MessagingService.Publish(i.taskCompletedQueue, payload)
+		task.SetComplete(entities.Complete)
+	} else {
+		task.SetComplete(entities.IncompleteAndRequeue)
+		log.WithError(err).WithField("task_id", task.JobID).Error("Could not serialize to XML. Requeueing.")
 	}
 }

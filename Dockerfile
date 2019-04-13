@@ -4,29 +4,32 @@ ARG GOARCH
 ARG ARCH
 FROM braindoctor/clustercode-worker:builder as builder
 
+ARG VERSION=unspecified
+ARG GIT_COMMIT=unspecified
+
 COPY / .
 RUN \
     pwd && \
-    env GO111MODULE=on go build
+    env GO111MODULE=on go build -ldflags "-X main.Version=${VERSION} -X main.Commit=${GIT_COMMIT}"
 
 #______________________________________________________________________________
 #### Runtime Image
 ARG ARCH
 FROM multiarch/alpine:${ARCH}
 
-WORKDIR /opt/clustercode
-
 RUN \
-    apk add --no-cache curl ffmpeg && \
+    apk add --no-cache curl ffmpeg libxml2 && \
     # Let's create the directories first so we can apply the permissions:
-    mkdir -m 664 /input /output /clustercode
+    mkdir -m 755 /usr/share/clustercode && \
+    mkdir -m 777 /input /output /var/tmp/clustercode
 
 VOLUME \
     /input \
     /output \
-    /clustercode
+    /var/tmp/clustercode
 
-CMD ["/opt/clustercode/entrypoint.sh"]
+ENTRYPOINT ["worker"]
 
-COPY ["defaults.yaml", "entrypoint.sh", "./"]
-COPY --from=builder /go/src/app/clustercode-worker ./
+COPY schema/clustercode_v1.xsd /usr/share/clustercode/
+COPY --from=builder /go/src/app/clustercode-worker /usr/bin/worker
+USER 1000

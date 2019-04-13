@@ -2,8 +2,8 @@ package api
 
 import (
 	"fmt"
-	"github.com/ccremer/clustercode-worker/util"
-	"github.com/micro/go-config"
+	"github.com/ccremer/clustercode-worker/config"
+	"github.com/ccremer/clustercode-worker/messaging"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
@@ -17,9 +17,11 @@ func TestSetProgressMetric_ShouldUpdateMetrics(t *testing.T) {
 		t.Skipf("Skipping integration test")
 	}
 
-	util.LoadConfig()
+	if err := config.LoadConfig(); err != nil {
+		t.Fatalf("Could not load config: %s", err)
+	}
 
-	StartServer()
+	StartHttpServer(&messaging.RabbitMqService{})
 	time.Sleep(1 * time.Second)
 	expected := Progress{
 		FPS:     20.4,
@@ -30,9 +32,10 @@ func TestSetProgressMetric_ShouldUpdateMetrics(t *testing.T) {
 
 	SetProgressMetric(expected)
 
-	port := config.Get("api", "http", "port").Int(8080)
+	addr := config.GetConfig().Api.Http.Address
+	uri := config.GetConfig().Prometheus.Uri
 
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/metrics", port))
+	resp, err := http.Get(fmt.Sprintf("http://localhost%s/%s", addr, uri))
 	assert.Empty(t, err)
 	defer resp.Body.Close()
 	linesRaw, err := ioutil.ReadAll(resp.Body)

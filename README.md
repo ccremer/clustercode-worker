@@ -2,9 +2,19 @@
 
 Worker microservice for clustercode [WIP]
 
+# Concept
+
+- Split video with `ffmpeg -i movie.mp4 -c copy -map 0 -segment_time 120 -f segment movie_segment_%d.mkv` on "shovel" node
+- Transcode each segment with `ffmpeg -i movie_segment_1.mp4 -c:v copy -c:a copy movie_segment_1.mkv`
+  on compute node (with whatever parameters)
+- Create the concat file: `echo "file movie_segment_1.mkv" >> concat.txt` (make sure they are sorted!)
+- Merge the segments back into 1 file: `ffmpeg -f concat -i concat.txt -c copy movie_out.mkv`
+
+# Development
+
 ## Building
 
-    sudo snap install go --classic # or whatever package manager you use
+    sudo snap install go --classic # or whatever package manager you use, tested is Go 1.12
     sudo apt-get install g++
     go mod vendor
     go build
@@ -19,10 +29,11 @@ Worker microservice for clustercode [WIP]
 
 ## Configuring for local development
 
-- Copy `defaults.yaml` to `config.yaml`
+- Copy `clustercode.yaml` to `localconfig.yaml`
 - Create the directories `input`, `output` in the current working dir.
-- Change the input and output dirs in `config.yaml`
-- Delete other values in `config.yaml` that are already default, leaving the custom ones left.
+- Change the input and output dirs in `localconfig.yaml`
+- Delete other values in `localconfig.yaml` that are already default, leaving the custom ones left.
+- When starting again, be sure to pass `-c localconfig` to the binary as arguments (without extension).
 
 ## Testing
 
@@ -53,12 +64,9 @@ Integration tests:
 * `master-amd64`: Same as master, built for x86 or AMD64 architecture.
 * `latest`: The latest stable image tag from the latest release branch. If you don't know which to pick, use this.
 * `latest-armhf`, `latest-arm64`, `latest-amd64`: Same schema as the master applies here. 
-* `2.x`, `2.x-armhf`, `2.x-arm64`, `2.x-amd64`: Particular release branch for a specific arch. Bugfixes go here too.
+* `2.x.y`, `2.x.y-armhf`, `2.x.y-arm64`, `2.x.y-amd64`: Particular Release tags
 
-# Concept
+## Code Style
 
-- Split video with `ffmpeg -i movie.mp4 -c copy -map 0 -segment_time 120 -f segment movie_segment_%d.mkv` on shovel node
-- Transcode each segment with `ffmpeg -i movie_segment_1.mp4 -c:v copy -c:a copy movie_segment_1.mkv`
-  on compute node (with whatever parameters)
-- Create the concat file: `echo "file movie_segment_1.mkv" >> concat.txt` (make sure they are sorted!)
-- Merge the segments back into 1 file: `ffmpeg -f concat -i concat.txt -c copy movie_out.mkv`
+* Passing `nil` to any of the clustercode specific internal API is considered
+  "wrong use of API". As such, clustercode will panic at some point if you do.

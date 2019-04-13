@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"github.com/micro/go-config"
 	log "github.com/sirupsen/logrus"
 	"math"
 	"net"
@@ -27,9 +26,7 @@ var (
 	extraArgs []string
 )
 
-func openUnixSocket() {
-
-	path := config.Get("api", "ffmpeg", "unix").String("/tmp/ffmpeg.sock")
+func openUnixSocket(path string) {
 
 	os.Remove(path)
 	l, err := net.Listen("unix", path)
@@ -52,7 +49,7 @@ func GetExtraArgsForProgress() []string {
 	return extraArgs
 }
 
-func parseProgressOutput(out string) (Progress) {
+func parseProgressOutput(out string) Progress {
 	fields := make(map[string]string)
 	for _, line := range strings.Split(out, "\n") {
 		fragments := strings.Split(line, "=")

@@ -1,17 +1,16 @@
 package process
 
 import (
-	"github.com/micro/go-config"
 	"github.com/thoas/go-funk"
 	"strings"
 )
 
-func replaceFields(args []string) []string {
+func (p *Process) replaceFields(args []string) []string {
 
 	fields := map[string]string{
-		"${input_dir}":  config.Get("input", "dir").String("/input"),
-		"${output_dir}": config.Get("output", "dir").String("/output"),
-		"${tmp_dir}":    config.Get("output", "tmpdir").String("/clustercode"),
+		"${input_dir}":  p.config.Input.Dir,
+		"${output_dir}": p.config.Output.Dir,
+		"${tmp_dir}":    p.config.Output.TmpDir,
 	}
 
 	return funk.Map(args, func(arg string) string {

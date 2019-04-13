@@ -24,7 +24,7 @@ var (
 	metricsChan = make(chan Progress, 2)
 )
 
-func init() {
+func EnableMetrics() {
 	// Register the summary and the histogram with Prometheus's default registry.
 	prometheus.MustRegister(frameCounter)
 	prometheus.MustRegister(bitrateDimension)

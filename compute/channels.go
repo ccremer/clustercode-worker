@@ -1,74 +1,37 @@
 package compute
 
 import (
-	"github.com/ccremer/clustercode-api-gateway/entities"
-	"github.com/ccremer/clustercode-api-gateway/messaging"
+	"github.com/ccremer/clustercode-worker/config"
+	"github.com/ccremer/clustercode-worker/entities"
+	"github.com/ccremer/clustercode-worker/messaging"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/streadway/amqp"
 )
 
-func openSliceCompleteQueue() *messaging.ChannelConfig {
-
-	qOpts := messaging.NewQueueOptions()
-
-	readQueueOptions("rabbitmq.channels.slice.completed.queue", qOpts)
-	return &messaging.ChannelConfig{
-		QueueOptions: qOpts,
-		//ExchangeOptions: messaging.NewExchangeOptions(),
-	}
+func getSliceCompleteQueue() *messaging.ChannelConfig {
+	return config.ConvertToChannelConfig(config.GetConfig().RabbitMq.Channels.Slice.Completed)
 }
 
-func openSliceAddedQueue(consumer func(slice *entities.SliceAddedEvent)) *messaging.ChannelConfig {
-
-	qOpts := messaging.NewQueueOptions()
-
-	readQueueOptions("rabbitmq.channels.slice.added.queue", qOpts)
-
-	return &messaging.ChannelConfig{
-		QueueOptions: qOpts,
-		Consumer: func(d *amqp.Delivery) {
-			if event, err := entities.DeserializeSliceAddedEvent(d); err == nil {
-				consumer(event)
-			} else {
-				log.WithField("error", err).Fatal("could not deserialize message")
-			}
-		},
+func getSliceAddedQueue(consumer func(slice *entities.SliceAddedEvent)) *messaging.ChannelConfig {
+	cfg := config.ConvertToChannelConfig(config.GetConfig().RabbitMq.Channels.Slice.Added)
+	cfg.Consumer = func(d *amqp.Delivery) {
+		if event, err := entities.DeserializeSliceAddedEvent(d); err == nil {
+			consumer(event)
+		} else {
+			log.WithError(err).Fatal("Could not deserialize message.")
+		}
 	}
+	return cfg
 }
 
-func openTaskCancelledQueue(consumer func(event *entities.TaskCancelledEvent)) *messaging.ChannelConfig {
-	eOpts := messaging.NewExchangeOptions()
-	qOpts := messaging.NewQueueOptions()
-	readExchangeOptions("rabbitmq.channels.task.cancelled.exchange", eOpts)
-	readQueueOptions("rabbitmq.channels.task.cancelled.queue", qOpts)
-	return &messaging.ChannelConfig{
-		ExchangeOptions: eOpts,
-		QueueOptions:qOpts,
-		Consumer: func(d *amqp.Delivery) {
-			if event, err := entities.DeserializeTaskCancelledEvent(d); err == nil {
-				consumer(event)
-			} else {
-				log.WithField("error", err).Fatal("could not deserialize message")
-			}
-		},
+func getTaskCancelledQueue(consumer func(event *entities.TaskCancelledEvent)) *messaging.ChannelConfig {
+	cfg := config.ConvertToChannelConfig(config.GetConfig().RabbitMq.Channels.Slice.Added)
+	cfg.Consumer = func(d *amqp.Delivery) {
+		if event, err := entities.DeserializeTaskCancelledEvent(d); err == nil {
+			consumer(event)
+		} else {
+			log.WithError(err).Fatal("Could not deserialize message.")
+		}
 	}
-}
-
-func readQueueOptions(key string, opts interface{}) {
-	if err := viper.UnmarshalKey(key, opts); err != nil {
-		log.WithFields(log.Fields{
-			"key":   key,
-			"error": err,
-		}).Fatal("could not read config value")
-	}
-}
-
-func readExchangeOptions(key string, opts interface{}) {
-	if err := viper.UnmarshalKey(key, opts); err != nil {
-		log.WithFields(log.Fields{
-			"key":   key,
-			"error": err,
-		}).Fatal("could not read config value")
-	}
+	return cfg
 }
