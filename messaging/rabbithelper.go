@@ -132,6 +132,7 @@ func beginConsuming(msgs <-chan amqp.Delivery, callback messageReceivedCallback)
 				"correlation_id": msg.CorrelationId,
 				"reply_to": msg.ReplyTo,
 				"consumer_tag": msg.ConsumerTag,
+				"body": string(msg.Body),
 			}).Debug("Received message.")
 			callback(&msg)
 		}
@@ -183,4 +184,3 @@ var defaultChannelInitializer = func(config *ChannelConfig, ch *amqp.Channel) {
 	}
 
 }
-

@@ -47,7 +47,7 @@ func (i *Instance) handleTaskAddedEvent(task *entities.TaskAddedEvent) {
 }
 
 func (i *Instance) sendTaskCompletedMessage(task *entities.TaskAddedEvent) {
-	payload, err := entities.ToXml(entities.TaskCompletedEvent{
+	payload, err := entities.ToJson(entities.TaskCompletedEvent{
 		JobID: task.JobID,
 	})
 	if err == nil {

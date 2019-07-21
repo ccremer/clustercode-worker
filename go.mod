@@ -20,4 +20,5 @@ require (
 	github.com/streadway/amqp v0.0.0-20181205114330-a314942b2fd9
 	github.com/stretchr/testify v1.3.0
 	github.com/thoas/go-funk v0.0.0-20181020164546-fbae87fb5b5c
+	gopkg.in/yaml.v2 v2.2.2
 )

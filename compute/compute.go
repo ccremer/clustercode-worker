@@ -122,7 +122,7 @@ func (i *Instance) listenForCancelMessage(ffmpeg *process.Process, currentTask *
 }
 
 func (i *Instance) sendSliceCompletedMessage(slice *entities.SliceAddedEvent) {
-	xml, err := entities.ToXml(entities.SliceCompletedEvent{
+	xml, err := entities.ToJson(entities.SliceCompletedEvent{
 		SliceNr: slice.SliceNr,
 		JobID:   slice.JobID,
 	})

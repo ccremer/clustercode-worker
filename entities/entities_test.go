@@ -2,11 +2,9 @@ package entities
 
 import (
 	"flag"
-	"github.com/ccremer/clustercode-worker/schema"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/url"
-	"path/filepath"
 	"testing"
 )
 
@@ -70,62 +68,31 @@ var serializationTests = []struct {
 	},
 }
 
-func TestSerializeXml(t *testing.T) {
-	for _, tt := range serializationTests {
-		t.Run(tt.name, func(t *testing.T) {
-			path := filepath.Join("testdata", tt.testFile)
-
-			// serialize
-			xmlString, err := ToXml(tt.expected)
-			assert.NoError(t, err)
-
-			updateGoldenFileIfNecessary(t, xmlString, path)
-
-			// verify from existing file
-			xmlBytes, err := ioutil.ReadFile(path)
-			assert.NoError(t, err)
-			assert.Equal(t, string(xmlBytes), xmlString+"\n")
-		})
-	}
-}
-
-func TestDeserializeXml(t *testing.T) {
-	Validator = schema.NewXmlValidator("../schema/clustercode_v1.xsd")
-	for _, tt := range serializationTests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			// get XML
-			path := filepath.Join("testdata", tt.testFile)
-			rawXmlBytes, ioErr := ioutil.ReadFile(path)
-			assert.NoError(t, ioErr)
-			xml := string(rawXmlBytes)
-
-			// deserialize
-			xmlErr := FromXml(xml, tt.result)
-			assert.NoError(t, xmlErr)
-
-			// verify
-			assert.Equal(t, tt.expected, tt.result)
-		})
-	}
-}
-
-func TestTaskAddedEvent_Priority_ShouldReturnPort(t *testing.T) {
-	cc_url, err := url.Parse("clustercode://base_dir:12/path")
+func TestMedia_Priority_ShouldReturnPort(t *testing.T) {
+	uri, err := url.Parse("clustercode://base_dir:12/path")
 	assert.NoError(t, err)
-	subject := TaskAddedEvent{File: cc_url,}
+	subject := Media{Path: uri,}
 
 	result := subject.Priority()
 	assert.Equal(t, 12, result)
 }
 
-func TestTaskAddedEvent_Priority_ShouldReturnZero(t *testing.T) {
-	cc_url, err := url.Parse("clustercode://base_dir/path")
+func TestMedia_GetSubstitutedPath_ShouldReplaceBasePath_Relative(t *testing.T) {
+	uri, err := url.Parse("clustercode://base_dir:12/path")
 	assert.NoError(t, err)
-	subject := TaskAddedEvent{File: cc_url,}
+	subject := Media{Path: uri,}
 
-	result := subject.Priority()
-	assert.Equal(t, 0, result)
+	result := subject.GetSubstitutedPath("replacement")
+	assert.Equal(t, "replacement/12/path", result)
+}
+
+func TestMedia_GetSubstitutedPath_ShouldReplaceBasePath_Absolute(t *testing.T) {
+	uri, err := url.Parse("clustercode://base_dir:12/path/another")
+	assert.NoError(t, err)
+	subject := Media{Path: uri,}
+
+	result := subject.GetSubstitutedPath("/replacement")
+	assert.Equal(t, "/replacement/12/path/another", result)
 }
 
 func updateGoldenFileIfNecessary(t *testing.T, content string, path string) {

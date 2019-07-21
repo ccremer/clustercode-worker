@@ -1,8 +1,16 @@
 #______________________________________________________________________________
-#### Builder Image
+#### Base Image, to save build time on local dev machine
 ARG GOARCH
 ARG ARCH
-FROM braindoctor/clustercode-worker:builder as builder
+FROM golang:1.12-alpine as builder
+
+WORKDIR /go/src/app
+
+COPY ["go.mod", "./"]
+
+RUN \
+    apk add --no-cache git build-base && \
+    env GO111MODULE=on go mod download
 
 ARG VERSION=unspecified
 ARG GIT_COMMIT=unspecified
@@ -15,10 +23,10 @@ RUN \
 #______________________________________________________________________________
 #### Runtime Image
 ARG ARCH
-FROM multiarch/alpine:${ARCH}
+FROM multiarch/alpine:${ARCH} as runtime
 
 RUN \
-    apk add --no-cache curl ffmpeg libxml2 && \
+    apk add --no-cache curl ffmpeg && \
     # Let's create the directories first so we can apply the permissions:
     mkdir -m 755 /usr/share/clustercode && \
     mkdir -m 777 /input /output /var/tmp/clustercode
@@ -28,8 +36,10 @@ VOLUME \
     /output \
     /var/tmp/clustercode
 
-ENTRYPOINT ["worker"]
+ENTRYPOINT ["clustercode-worker"]
+CMD ["-c", "clustercode"]
 
-COPY schema/clustercode_v1.xsd /usr/share/clustercode/
-COPY --from=builder /go/src/app/clustercode-worker /usr/bin/worker
+COPY --from=builder /go/src/app/clustercode-worker /usr/bin/clustercode-worker
+RUN \
+    clustercode-worker --save-config /usr/share/clustercode/clustercode.yaml
 USER 1000
