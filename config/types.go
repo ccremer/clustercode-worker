@@ -1,19 +1,37 @@
 package config
 
 import (
+	"fmt"
 	"github.com/ccremer/clustercode-worker/messaging"
 	"github.com/prometheus/common/log"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"strings"
+)
+
+const (
+	RoleShovel            = "shovel"
+	RoleCompute           = "compute"
+	LogLevelDebug         = "debug"
+	LogLevelInfo          = "info"
+	LogLevelWarn          = "warn"
+	LogLevelError         = "error"
+	LogLevelFatal         = "fatal"
+	LogFormatterText      = "text"
+	LogFormatterJson      = "json"
+	ApiFfmpegDebugNone    = "none"
+	ApiFfmpegDebugLog     = "to-log"
+	ApiFfmpegDebugOut     = "to-out"
+	ApiFfmpegProtocolUnix = "unix"
 )
 
 func CreateDefaultConfig() ConfigMap {
 	return ConfigMap{
 		Role: "",
 		Log: LogMap{
-			Level:      "info",
+			Level:      LogLevelInfo,
 			Timestamps: false,
-			Formatter:  "text",
+			Formatter:  LogFormatterText,
 			Caller:     false,
 		},
 		RabbitMq: RabbitMqMap{
@@ -65,16 +83,18 @@ func CreateDefaultConfig() ConfigMap {
 		Api: ApiMap{
 			Ffmpeg: FfmpegMap{
 				DefaultArgs: []string{"-y", "-hide_banner", "-nostats"},
-				Protocol:    "unix",
+				Protocol:    ApiFfmpegProtocolUnix,
 				Unix:        "/tmp/ffmpeg.sock",
+				SplitArgs: []string{
+					"-i", "${INPUT}", "-c", "copy", "-map", "0", "-segment_time", "${SLICE_SIZE}", "-f", "segment",
+					"${TMP}/${JOB}_segment_%d${FORMAT}"},
+				MergeArgs: []string{"-f", "concat", "-i", "concat.txt", "-c", "copy", "movie_out.mkv"},
+				Debug:     ApiFfmpegDebugNone,
 			},
 			Http: HttpMap{
-				Address:   ":8080",
-				ReadyUri:  "/.well-known/ready",
-				HealthUri: "/.well-known/health",
-			},
-			Schema: SchemaMap{
-				Path: "/usr/share/clustercode/clustercode_v1.xsd",
+				Address:      ":8080",
+				ReadinessUri: "/health/ready",
+				LivenessUri:  "/health/live",
 			},
 		},
 		Input: InputMap{
@@ -86,7 +106,7 @@ func CreateDefaultConfig() ConfigMap {
 		},
 		Prometheus: PrometheusMap{
 			Enabled: true,
-			Uri:     "/.well-known/metrics",
+			Uri:     "/metrics",
 		},
 	}
 }
@@ -96,15 +116,17 @@ func SetupFlags() {
 	cfg := CreateDefaultConfig()
 
 	flag.StringP("log.level", "l", cfg.Log.Level,
-		"Logging level. Allowed values are either ['debug','info','warn','error','fatal']")
+		fmt.Sprintf("Logging level. Allowed values are either [%s]", strings.Join([]string{
+			LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError, LogLevelFatal}[:], ", ")))
 	flag.StringP("config", "c", "",
 		"Config file path and name without extension")
 	flag.StringP("role", "R", cfg.Role,
-		"The role of this worker. Allowed values are either ['compute','shovel']")
+		fmt.Sprintf("The role of this worker. Allowed values are either [%s]", strings.Join([]string{
+			RoleCompute, RoleShovel}[:], ", ")))
 	flag.String("rabbitmq.url", cfg.RabbitMq.Url, "RabbitMq connection string")
 	flag.String("api.http.address", cfg.Api.Http.Address, "HTTP API server listen address")
-	flag.String("api.schema.path", cfg.Api.Schema.Path, "XML Schema definition file for API messages")
 	flag.Bool("prometheus.enabled", cfg.Prometheus.Enabled, "Whether metrics exporter is enabled")
+	flag.String("save-config", "",  "Save the final config to the given file path and exit")
 
 	if err := viper.BindPFlags(flag.CommandLine); err != nil {
 		log.Fatal(err)
@@ -152,20 +174,19 @@ type (
 	ApiMap struct {
 		Ffmpeg FfmpegMap
 		Http   HttpMap
-		Schema SchemaMap
 	}
 	HttpMap struct {
-		Address   string
-		HealthUri string
-		ReadyUri  string
+		Address      string
+		LivenessUri  string
+		ReadinessUri string
 	}
 	FfmpegMap struct {
 		DefaultArgs []string
 		Protocol    string
 		Unix        string
-	}
-	SchemaMap struct {
-		Path string
+		SplitArgs   []string
+		MergeArgs   []string
+		Debug       string
 	}
 	InputMap struct {
 		Dir string

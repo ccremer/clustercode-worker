@@ -8,6 +8,7 @@ import (
 	"github.com/ccremer/clustercode-worker/messaging"
 	"github.com/ccremer/clustercode-worker/shovel"
 	log "github.com/sirupsen/logrus"
+	"strings"
 )
 
 var Version string
@@ -30,7 +31,8 @@ func main() {
 		log.WithFields(log.Fields{
 			"variable": "role",
 			"help": fmt.Sprintf("Specify the role either in CC_ROLE, by providing the CLI flag --role, "+
-				"or in a config file. Allowed values: %s", []string{config.RoleCompute, config.RoleShovel}),
+				"or in a config file. Allowed values: [%s]",
+				strings.Join([]string{config.RoleCompute, config.RoleShovel}, ",")),
 		}).Fatal("Correct role specification of this worker is required.")
 	}
 
@@ -44,11 +46,10 @@ func main() {
 		shovel.NewInstance(service)
 	}
 
-
 	forever := make(chan bool)
 	log.WithFields(log.Fields{
 		"version": Version,
-		"commit": Commit,
+		"commit":  Commit,
 		"role":    role,
 	}).Info("Startup complete.")
 	<-forever

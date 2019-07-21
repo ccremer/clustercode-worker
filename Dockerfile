@@ -26,7 +26,7 @@ ARG ARCH
 FROM multiarch/alpine:${ARCH} as runtime
 
 RUN \
-    apk add --no-cache curl ffmpeg && \
+    apk add --no-cache curl ffmpeg bash && \
     # Let's create the directories first so we can apply the permissions:
     mkdir -m 755 /usr/share/clustercode && \
     mkdir -m 777 /input /output /var/tmp/clustercode

@@ -6,6 +6,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +21,7 @@ func init() {
 func LoadConfig() error {
 	//viper.Debug()
 
-	viper.SetEnvPrefix("cc")
+	viper.SetEnvPrefix("CC")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
@@ -38,6 +40,7 @@ func LoadConfig() error {
 		viper.SetConfigName(file)
 		viper.AddConfigPath(filepath.Dir(fullFilename))
 		viper.AddConfigPath(".")
+		viper.AddConfigPath(filepath.Join("/", "usr", "share", "clustercode"))
 
 		return viper.ReadInConfig()
 	}
@@ -52,6 +55,25 @@ func GetConfig() ConfigMap {
 		log.Fatal(err)
 	}
 	return cfg
+}
+
+func SaveConfig() {
+	cfg := GetConfig()
+
+	d, err := yaml.Marshal(cfg)
+	if err != nil {
+		log.WithError(err).Fatal("Could not save config.")
+	}
+	fileName := flag.Lookup("save-config").Value.String()
+	if fileName == "" {
+		return
+	}
+
+	if err := ioutil.WriteFile(fileName, d, 0665); err != nil {
+		log.WithError(err).Fatal("Could not save config.")
+	}
+	log.WithField("file", fileName).Info("Config saved.")
+	os.Exit(0)
 }
 
 func createDefaultQosConfig() *messaging.QosOptions {
@@ -72,18 +94,24 @@ func ConfigureLogging() {
 	cfg := GetConfig()
 
 	switch cfg.Log.Formatter {
-	case "json":
-		log.SetFormatter(&log.JSONFormatter{DisableTimestamp: cfg.Log.Timestamps})
-	case "text":
-		log.SetFormatter(&log.TextFormatter{DisableTimestamp: cfg.Log.Timestamps, FullTimestamp: true})
+	case LogFormatterJson:
+		log.SetFormatter(&log.JSONFormatter{
+			DisableTimestamp: cfg.Log.Timestamps,
+		})
+	case LogFormatterText:
+		log.SetFormatter(&log.TextFormatter{
+			DisableTimestamp:       cfg.Log.Timestamps,
+			FullTimestamp:          true,
+			DisableLevelTruncation: true,
+		})
 		log.WithField("help", "If using ELK/EFK stack, you may want to use the json format (configurable).").
 			Info("Using text formatter for logging.")
 	default:
 		log.WithFields(log.Fields{
 			"variable": "log.formatter",
-			"help":     fmt.Sprintf("allowed: %s", []string{"json", "text"}),
+			"help":     fmt.Sprintf("allowed: %s", []string{LogFormatterJson, LogFormatterText}),
 			"value":    cfg.Log.Formatter,
-			"default": CreateDefaultConfig().Log.Formatter,
+			"default":  CreateDefaultConfig().Log.Formatter,
 		}).Warnf("Log formatter is not supported. Using default.")
 	}
 
@@ -106,4 +134,3 @@ func ConvertToChannelConfig(cfg ChannelMap) *messaging.ChannelConfig {
 		ExchangeOptions: &cfg.Exchange,
 	}
 }
-

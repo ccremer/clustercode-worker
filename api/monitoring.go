@@ -6,79 +6,136 @@ import (
 	"github.com/ccremer/clustercode-worker/entities"
 	"github.com/ccremer/clustercode-worker/messaging"
 	log "github.com/sirupsen/logrus"
+	"github.com/thoas/go-funk"
 	"net/http"
 	"os"
 )
 
 type (
+	HealthCheckStatus string
 	HealthCheckDto struct {
-		InputDir  string `json:"input_dir"`
-		OutputDir string `json:"output_dir"`
-		Messaging string `json:"messaging"`
+		Checks  []HealthCheck     `json:"checks"`
+		Outcome HealthCheckStatus `json:"outcome"`
 	}
-	ReadynessCheckDto struct {
-		Database string `json:"database"`
-
+	HealthCheck struct {
+		Id     string                 `json:"id"`
+		Status HealthCheckStatus      `json:"status"`
+		Data   map[string]interface{} `json:"data"`
 	}
 	Instance struct {
-		config config.ConfigMap
+		config           config.ConfigMap
 		MessagingService *messaging.RabbitMqService
 	}
 )
 
-func (i *Instance) handleHealth(w http.ResponseWriter, r *http.Request) {
-	dto := HealthCheckDto{}
-	faulty := false
-	msg, failure := checkOutputDir(i.config.Output.Dir)
-	if failure {
-		faulty = true
-	}
-	dto.OutputDir = msg
-	msg, failure = checkInputDir(i.config.Input.Dir)
-	if failure {
-		faulty = true
-	}
-	dto.InputDir = msg
-	if i.MessagingService.IsConnected() {
-		dto.Messaging = "ok"
-	} else {
-		dto.Messaging = "disconnected"
-		faulty = true
+const (
+	UpKey   HealthCheckStatus = "UP"
+	DownKey HealthCheckStatus = "DOWN"
+)
+
+func (i *Instance) handleLiveness(w http.ResponseWriter, r *http.Request) {
+	dto := HealthCheckDto{
+		Outcome: UpKey,
+		Checks:  []HealthCheck{},
 	}
 
-	if faulty {
+	dto.Checks = append(dto.Checks, checkOutputDir(i.config.Output.Dir))
+	dto.Checks = append(dto.Checks, checkInputDir(i.config.Input.Dir))
+	dto.Checks = append(dto.Checks, checkMessagingService(i.MessagingService))
+
+	respondHealthRequest(w, r, &dto)
+}
+
+func (i *Instance) handleReadiness(w http.ResponseWriter, r *http.Request) {
+	dto := HealthCheckDto{
+		Outcome: UpKey,
+		Checks:  []HealthCheck{},
+	}
+
+	dto.Checks = append(dto.Checks, checkMessagingService(i.MessagingService))
+
+	respondHealthRequest(w, r, &dto)
+}
+
+func respondHealthRequest(w http.ResponseWriter, r *http.Request, dto *HealthCheckDto) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	failed := funk.Contains(
+		funk.Map(dto.Checks, func(check HealthCheck) bool {
+			return check.Status == DownKey
+		}),
+		true)
+
+	if failed {
+		dto.Outcome = DownKey
 		w.WriteHeader(500)
 	} else {
 		w.WriteHeader(200)
 	}
 
 	json, _ := entities.ToJson(dto)
-	fmt.Fprint(w, json)
+	_, err := fmt.Fprint(w, json)
+	logEvent := log.WithFields(log.Fields{
+		"response": json,
+		"request":  r.RequestURI,
+	})
+	if err != nil {
+		logEvent.WithError(err).Warn("Could not write response to client.")
+	}
 
-	log.Debugf("response: %s", json)
+	logEvent.Debug("Served request.")
 }
 
-func (i *Instance) handleReadyness(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func checkOutputDir(dir string) (string, bool) {
+func checkOutputDir(dir string) HealthCheck {
 	name := dir + "/.health"
 	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE, 0666)
-	defer file.Close()
-	if err != nil {
-		log.Warnf("%s", err)
-		return fmt.Sprint(err), true
-	} else {
+	if file != nil {
+		file.Close()
 		os.Remove(name)
-		return "ok", false
 	}
+	check := HealthCheck{
+		Id: "output_dir",
+		Data: map[string]interface{}{
+			"file": name,
+		},
+		Status: UpKey,
+	}
+	if err == nil {
+		check.Data["writable"] = true
+	} else {
+		check.Data["writable"] = false
+		check.Status = DownKey
+		check.Data["error"] = err.Error()
+		log.Warnf("%s", err)
+	}
+	return check
 }
 
-func checkInputDir(path string) (string, bool) {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return fmt.Sprint(err), true
-	} else {
-		return "ok", false
+func checkInputDir(path string) HealthCheck {
+	check := HealthCheck{
+		Id: "input_dir",
+		Data: map[string]interface{}{
+			"file": path,
+		},
+		Status: UpKey,
 	}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		check.Status = DownKey
+		check.Data["error"] = err.Error()
+	}
+	return check
+}
+
+func checkMessagingService(service *messaging.RabbitMqService) HealthCheck {
+	check := HealthCheck{
+		Id: "rabbitmq",
+		Data: map[string]interface{}{
+			"connected": service.IsConnected(),
+		},
+		Status: UpKey,
+	}
+	if !service.IsConnected() {
+		check.Status = DownKey
+	}
+	return check
 }

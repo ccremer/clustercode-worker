@@ -7,8 +7,6 @@ require (
 	github.com/efritz/watchdog v0.0.0-20181228234521-84cf7cb74656
 	github.com/go-cmd/cmd v1.0.4
 	github.com/go-test/deep v1.0.1 // indirect
-	github.com/jbussdieker/golibxml v0.0.0-20190103165431-90c340ae5026
-	github.com/krolaw/xsd v0.0.0-20190108013600-03ca754cf4c5
 	github.com/prometheus/client_golang v0.9.2
 	github.com/prometheus/client_model v0.0.0-20190115171406-56726106282f // indirect
 	github.com/prometheus/common v0.0.0-20190107103113-2998b132700a

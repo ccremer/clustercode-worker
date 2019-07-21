@@ -5,18 +5,12 @@ import (
 	"strings"
 )
 
-func (p *Process) replaceFields(args []string) []string {
-
-	fields := map[string]string{
-		"${input_dir}":  p.config.Input.Dir,
-		"${output_dir}": p.config.Output.Dir,
-		"${tmp_dir}":    p.config.Output.TmpDir,
-	}
+func (p *Process) replaceFields(args []string, replacements map[string]string) []string {
 
 	return funk.Map(args, func(arg string) string {
 		tmp := arg
-		funk.ForEach(fields, func(k string, v string) {
-			tmp = strings.Replace(tmp, k, v, -1)
+		funk.ForEach(replacements, func(k string, v string) {
+			tmp = strings.ReplaceAll(tmp, k, v)
 		})
 		return tmp
 	}).([]string)

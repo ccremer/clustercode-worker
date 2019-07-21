@@ -4,3 +4,5 @@
 /clustercode-worker
 
 /config.yaml
+!/tmp/.keep
+/tmp

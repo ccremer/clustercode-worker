@@ -11,9 +11,13 @@ var cfg = config.CreateDefaultConfig()
 func TestReplaceFields_ShouldReplaceInputDir(t *testing.T) {
 	p := Process{config: &cfg,}
 	expected := []string{"/input/0/movie.mp4", "-hide_banner"}
-	args := []string{"${input_dir}/0/movie.mp4", "-hide_banner"}
+	args := []string{"${INPUT}/0/movie.mp4", "-hide_banner"}
 
-	result := p.replaceFields(args)
+	result := p.replaceFields(args, map[string]string{
+		"${INPUT}":  p.config.Input.Dir,
+		"${OUTPUT}": p.config.Output.Dir,
+		"${TMP}":    p.config.Output.TmpDir,
+	})
 
 	assert.Equal(t, expected, result)
 }
@@ -21,9 +25,13 @@ func TestReplaceFields_ShouldReplaceInputDir(t *testing.T) {
 func TestReplaceFields_ShouldReplaceOutputDir(t *testing.T) {
 	p := Process{config: &cfg,}
 	expected := []string{"/output/0/movie.mp4", "-hide_banner"}
-	args := []string{"${output_dir}/0/movie.mp4", "-hide_banner"}
+	args := []string{"${OUTPUT}/0/movie.mp4", "-hide_banner"}
 
-	result := p.replaceFields(args)
+	result := p.replaceFields(args, map[string]string{
+		"${INPUT}":  p.config.Input.Dir,
+		"${OUTPUT}": p.config.Output.Dir,
+		"${TMP}":    p.config.Output.TmpDir,
+	})
 
 	assert.Equal(t, expected, result)
 }
@@ -31,9 +39,13 @@ func TestReplaceFields_ShouldReplaceOutputDir(t *testing.T) {
 func TestReplaceFields_ShouldReplaceAllVariables(t *testing.T) {
 	p := Process{config: &cfg,}
 	expected := []string{"/input/output/movie.mp4", "/output"}
-	args := []string{"${input_dir}${output_dir}/movie.mp4", "${output_dir}"}
+	args := []string{"${INPUT}${OUTPUT}/movie.mp4", "${OUTPUT}"}
 
-	result := p.replaceFields(args)
+	result := p.replaceFields(args, map[string]string{
+		"${INPUT}":  p.config.Input.Dir,
+		"${OUTPUT}": p.config.Output.Dir,
+		"${TMP}":    p.config.Output.TmpDir,
+	})
 
 	assert.Equal(t, expected, result)
 }

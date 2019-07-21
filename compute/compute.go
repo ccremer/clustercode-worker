@@ -9,6 +9,7 @@ import (
 	"github.com/ccremer/clustercode-worker/messaging"
 	"github.com/ccremer/clustercode-worker/process"
 	log "github.com/sirupsen/logrus"
+	"strconv"
 )
 
 type (
@@ -27,12 +28,8 @@ func NewComputeInstance(service *messaging.RabbitMqService) Instance {
 		taskCancelledChan: make(chan *entities.TaskCancelledEvent),
 	}
 	service.AddChannelConfig(getSliceCompleteQueue())
-
 	service.AddChannelConfig(getSliceAddedQueue(i.handleSliceAddedEvent))
-	log.Infof("Listening for task slices.")
-
 	service.AddChannelConfig(getTaskCancelledQueue(i.handleTaskCancelledEvent))
-	log.Infof("Listening for task cancellations.")
 
 	return i
 }
@@ -42,9 +39,15 @@ func (i *Instance) handleSliceAddedEvent(sliceAddedEvent *entities.SliceAddedEve
 		log.WithFields(log.Fields{
 			"job_id":   sliceAddedEvent.JobID,
 			"slice_nr": sliceAddedEvent.SliceNr,
-		}).Infof("Processing SliceAddedEvent")
-		ffmpeg := process.New(append(sliceAddedEvent.Args, api.GetExtraArgsForProgress()[:]...), config.GetConfig())
-		ffmpeg.StartProcess()
+		}).Info("Processing SliceAddedEvent")
+		c := config.GetConfig()
+		ffmpeg := process.New(append(sliceAddedEvent.Args, api.GetExtraArgsForProgress()[:]...), c)
+		ffmpeg.StartProcess(map[string]string{
+			"${INPUT}":  c.Input.Dir,
+			"${OUTPUT}": c.Output.Dir,
+			"${TMP}":    c.Output.TmpDir,
+			"${SLICES}": strconv.Itoa(sliceAddedEvent.SliceNr),
+		})
 		sliceCompletedEvent := &entities.SliceCompletedEvent{
 			JobID:   sliceAddedEvent.JobID,
 			SliceNr: sliceAddedEvent.SliceNr,

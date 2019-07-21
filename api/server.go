@@ -15,13 +15,13 @@ func StartHttpServer(service *messaging.RabbitMqService) {
 	cfg := config.GetConfig()
 	addr := cfg.Api.Http.Address
 	monitoringInstance := Instance{
-		config:cfg,
+		config:           cfg,
 		MessagingService: service,
 	}
-	log.WithField("address", addr).Info("Starting http server")
+	log.WithField("address", addr).Info("Starting http server.")
 	http.HandleFunc("/", handleRoot)
-	http.HandleFunc(cfg.Api.Http.HealthUri, monitoringInstance.handleHealth)
-	http.HandleFunc(cfg.Api.Http.ReadyUri, monitoringInstance.handleReadyness)
+	http.HandleFunc(cfg.Api.Http.LivenessUri, monitoringInstance.handleLiveness)
+	http.HandleFunc(cfg.Api.Http.ReadinessUri, monitoringInstance.handleReadiness)
 	if cfg.Prometheus.Enabled {
 		EnableMetrics()
 		http.Handle(cfg.Prometheus.Uri, promhttp.Handler())
@@ -33,14 +33,17 @@ func StartHttpServer(service *messaging.RabbitMqService) {
 
 	ffmpegProtocol := strings.ToLower(cfg.Api.Ffmpeg.Protocol)
 	switch ffmpegProtocol {
-	case "unix":
+	case config.ApiFfmpegProtocolUnix:
 		openUnixSocket(cfg.Api.Ffmpeg.Unix)
 	default:
-		log.WithField("protocol", ffmpegProtocol).Fatal("ffmpeg protocol is not supported")
+		log.WithField("protocol", ffmpegProtocol).Fatal("Ffmpeg protocol is not supported.")
 	}
 
 }
 
 func handleRoot(writer http.ResponseWriter, request *http.Request) {
-	fmt.Fprintf(writer, "This page is intentionally left blank. You might want to check the API URLs")
+	_, err := fmt.Fprintf(writer, "This page is intentionally left blank. You might want to check the API URLs.")
+	if err != nil {
+		log.Warn(err)
+	}
 }
