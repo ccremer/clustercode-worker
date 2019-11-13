@@ -71,7 +71,7 @@ var serializationTests = []struct {
 func TestMedia_Priority_ShouldReturnPort(t *testing.T) {
 	uri, err := url.Parse("clustercode://base_dir:12/path")
 	assert.NoError(t, err)
-	subject := Media{Path: uri,}
+	subject := Media{Path: uri}
 
 	result := subject.Priority()
 	assert.Equal(t, 12, result)
@@ -80,7 +80,7 @@ func TestMedia_Priority_ShouldReturnPort(t *testing.T) {
 func TestMedia_GetSubstitutedPath_ShouldReplaceBasePath_Relative(t *testing.T) {
 	uri, err := url.Parse("clustercode://base_dir:12/path")
 	assert.NoError(t, err)
-	subject := Media{Path: uri,}
+	subject := Media{Path: uri}
 
 	result := subject.GetSubstitutedPath("replacement")
 	assert.Equal(t, "replacement/12/path", result)
@@ -89,7 +89,7 @@ func TestMedia_GetSubstitutedPath_ShouldReplaceBasePath_Relative(t *testing.T) {
 func TestMedia_GetSubstitutedPath_ShouldReplaceBasePath_Absolute(t *testing.T) {
 	uri, err := url.Parse("clustercode://base_dir:12/path/another")
 	assert.NoError(t, err)
-	subject := Media{Path: uri,}
+	subject := Media{Path: uri}
 
 	result := subject.GetSubstitutedPath("/replacement")
 	assert.Equal(t, "/replacement/12/path/another", result)

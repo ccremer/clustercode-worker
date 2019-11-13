@@ -5,21 +5,26 @@ import (
 )
 
 var (
+	namespace    = "clustercode"
 	frameCounter = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "clustercode_compute_frame_count",
-		Help: "Current frame counter of a the slice.",
+		Namespace: namespace,
+		Name:      "compute_frame_count",
+		Help:      "Current frame counter of a the slice.",
 	})
 	bitrateDimension = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "clustercode_compute_bitrate",
-		Help: "Current bit rate of a the slice.",
+		Namespace: namespace,
+		Name:      "compute_bitrate",
+		Help:      "Current bit rate of a the slice.",
 	})
 	speedDimension = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "clustercode_compute_speed",
-		Help: "Current speed of a the slice as factor of the playback time of the media.",
+		Namespace: namespace,
+		Name:      "compute_speed",
+		Help:      "Current speed of a the slice as factor of the playback time of the media.",
 	})
 	fpsDimension = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "clustercode_compute_fps",
-		Help: "Current frames per second of a the slice.",
+		Namespace: namespace,
+		Name:      "compute_fps",
+		Help:      "Current frames per second of a the slice.",
 	})
 	metricsChan = make(chan Progress, 2)
 )

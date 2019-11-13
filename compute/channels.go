@@ -8,15 +8,15 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func getSliceCompleteQueue() *messaging.ChannelConfig {
+func createSliceCompleteQueue() *messaging.ChannelConfig {
 	return config.ConvertToChannelConfig(config.GetConfig().RabbitMq.Channels.Slice.Completed)
 }
 
-func getSliceAddedQueue(consumer func(slice *entities.SliceAddedEvent)) *messaging.ChannelConfig {
+func createSliceAddedQueue(consumer func(d *amqp.Delivery, slice *entities.SliceAddedEvent)) *messaging.ChannelConfig {
 	cfg := config.ConvertToChannelConfig(config.GetConfig().RabbitMq.Channels.Slice.Added)
 	cfg.Consumer = func(d *amqp.Delivery) {
 		if event, err := entities.DeserializeSliceAddedEvent(d); err == nil {
-			consumer(event)
+			consumer(d, event)
 		} else {
 			log.WithError(err).Fatal("Could not deserialize message.")
 		}
@@ -24,11 +24,11 @@ func getSliceAddedQueue(consumer func(slice *entities.SliceAddedEvent)) *messagi
 	return cfg
 }
 
-func getTaskCancelledQueue(consumer func(event *entities.TaskCancelledEvent)) *messaging.ChannelConfig {
-	cfg := config.ConvertToChannelConfig(config.GetConfig().RabbitMq.Channels.Slice.Added)
+func createTaskCancelledQueue(consumer func(d *amqp.Delivery, event *entities.TaskCancelledEvent)) *messaging.ChannelConfig {
+	cfg := config.ConvertToChannelConfig(config.GetConfig().RabbitMq.Channels.Task.Cancelled)
 	cfg.Consumer = func(d *amqp.Delivery) {
 		if event, err := entities.DeserializeTaskCancelledEvent(d); err == nil {
-			consumer(event)
+			consumer(d, event)
 		} else {
 			log.WithError(err).Fatal("Could not deserialize message.")
 		}

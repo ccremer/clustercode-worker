@@ -17,53 +17,45 @@ type (
 		MessagingService     *messaging.RabbitMqService
 		SliceCompleteChannel *messaging.ChannelConfig
 		sliceCompleteChan    chan *entities.SliceCompletedEvent
-		taskCancelledChan    chan *entities.TaskCancelledEvent
+		CurrentTask          *entities.SliceAddedEvent
+		CurrentProcess       *process.Process
+	}
+	TaskResult struct {
+		SliceAddedEvent *entities.SliceAddedEvent
+		ErrorCode       int
+		Error           error
+		Cancelled       bool
 	}
 )
 
-func NewComputeInstance(service *messaging.RabbitMqService) Instance {
-	i := Instance{
-		MessagingService:  service,
-		sliceCompleteChan: make(chan *entities.SliceCompletedEvent),
-		taskCancelledChan: make(chan *entities.TaskCancelledEvent),
+func (i *Instance) ProcessSlice(sliceAddedEvent *entities.SliceAddedEvent) TaskResult {
+	log.WithFields(log.Fields{
+		"job_id":   sliceAddedEvent.JobID,
+		"slice_nr": sliceAddedEvent.SliceNr,
+	}).Info("Processing SliceAddedEvent")
+	c := config.GetConfig()
+	ffmpeg := process.New(append(sliceAddedEvent.Args, api.GetExtraArgsForProgress()[:]...), c)
+	ffmpeg.StartProcess(map[string]string{
+		"${INPUT}":  c.Input.Dir,
+		"${OUTPUT}": c.Output.Dir,
+		"${TMP}":    c.Output.TmpDir,
+		"${SLICES}": strconv.Itoa(sliceAddedEvent.SliceNr),
+	})
+	i.CurrentProcess = ffmpeg
+	i.CurrentTask = sliceAddedEvent
+	sliceCompletedEvent := &entities.SliceCompletedEvent{
+		JobID:   sliceAddedEvent.JobID,
+		SliceNr: sliceAddedEvent.SliceNr,
 	}
-	service.AddChannelConfig(getSliceCompleteQueue())
-	service.AddChannelConfig(getSliceAddedQueue(i.handleSliceAddedEvent))
-	service.AddChannelConfig(getTaskCancelledQueue(i.handleTaskCancelledEvent))
-
-	return i
-}
-
-func (i *Instance) handleSliceAddedEvent(sliceAddedEvent *entities.SliceAddedEvent) {
-	for {
-		log.WithFields(log.Fields{
-			"job_id":   sliceAddedEvent.JobID,
-			"slice_nr": sliceAddedEvent.SliceNr,
-		}).Info("Processing SliceAddedEvent")
-		c := config.GetConfig()
-		ffmpeg := process.New(append(sliceAddedEvent.Args, api.GetExtraArgsForProgress()[:]...), c)
-		ffmpeg.StartProcess(map[string]string{
-			"${INPUT}":  c.Input.Dir,
-			"${OUTPUT}": c.Output.Dir,
-			"${TMP}":    c.Output.TmpDir,
-			"${SLICES}": strconv.Itoa(sliceAddedEvent.SliceNr),
-		})
-		sliceCompletedEvent := &entities.SliceCompletedEvent{
-			JobID:   sliceAddedEvent.JobID,
-			SliceNr: sliceAddedEvent.SliceNr,
-		}
-		if sliceAddedEvent.SliceNr == 0 {
-			i.handleOutput(ffmpeg, sliceCompletedEvent)
-		}
-		go i.listenForCancelMessage(ffmpeg, sliceAddedEvent)
-		err := i.waitForProcessToFinish(ffmpeg, sliceAddedEvent)
-		api.ResetProgressMetrics()
-		if err == nil {
-			return
-		} else {
-			log.Warn(err.Error())
-		}
+	if sliceAddedEvent.SliceNr == 0 {
+		i.handleOutput(ffmpeg, sliceCompletedEvent)
 	}
+	result := TaskResult{SliceAddedEvent: sliceAddedEvent}
+	waitForProcessToFinish(ffmpeg, sliceAddedEvent, &result)
+	api.ResetProgressMetrics()
+	i.CurrentProcess = nil
+	i.CurrentProcess = nil
+	return result
 }
 
 func (i *Instance) handleOutput(ffmpeg *process.Process, slice *entities.SliceCompletedEvent) {
@@ -81,56 +73,49 @@ func (i *Instance) handleOutput(ffmpeg *process.Process, slice *entities.SliceCo
 		})
 }
 
-func (i *Instance) waitForProcessToFinish(ffmpeg *process.Process, slice *entities.SliceAddedEvent) error {
+func waitForProcessToFinish(ffmpeg *process.Process, slice *entities.SliceAddedEvent, result *TaskResult) {
 	status := <-ffmpeg.Cmd.Start()
 	if slice.SliceNr == 0 {
 		ffmpeg.WaitForOutput()
 	}
 	if status.Error != nil || status.Exit > 0 {
 		if status.Exit < 255 {
-			slice.SetComplete(entities.IncompleteAndRequeue)
-			return errors.New(fmt.Sprintf("Task failed with exit code %d.", status.Exit))
+			result.Error = errors.New(fmt.Sprintf("Task failed with exit code %d.", status.Exit))
 		} else {
-			slice.SetComplete(entities.Complete)
 			log.Infof("Task cancelled.")
-			return nil
+			result.Cancelled = true
 		}
 	} else {
-		slice.SetComplete(entities.Complete)
-		i.sendSliceCompletedMessage(slice)
 		log.Infof("Task slice finished.")
-		return nil
 	}
 }
 
-func (i *Instance) handleTaskCancelledEvent(event *entities.TaskCancelledEvent) {
-	log.Info(event)
-	i.taskCancelledChan <- event
-}
-
-func (i *Instance) listenForCancelMessage(ffmpeg *process.Process, currentTask *entities.SliceAddedEvent) {
-	for {
-		event := <-i.taskCancelledChan
-		logEntry := log.WithField("task_id", event.JobID)
-		if event.JobID == currentTask.JobID {
-			logEntry.Warn("Cancelling task.")
-			ffmpeg.Cmd.Stop()
-		} else {
+func (i *Instance) CancelTask(event *entities.TaskCancelledEvent) bool {
+	logEntry := log.WithField("task_id", event.JobID)
+	if event.JobID == i.CurrentTask.JobID {
+		logEntry.Debug("Cancelling task.")
+		err := i.CurrentProcess.Cmd.Stop()
+		if err != nil {
 			logEntry.
-				WithField("current", currentTask.JobID).
-				Debug("TaskCancelledEvent does not match current job.")
+				WithError(err).
+				Warn("Task cancelled before it has started.")
 		}
-		event.SetComplete(entities.Complete)
+		return true
+	} else {
+		logEntry.
+			WithField("current", i.CurrentTask.JobID).
+			Debug("TaskCancelledEvent does not match current job.")
+		return false
 	}
 }
 
 func (i *Instance) sendSliceCompletedMessage(slice *entities.SliceAddedEvent) {
-	xml, err := entities.ToJson(entities.SliceCompletedEvent{
+	payload, err := entities.ToJson(entities.SliceCompletedEvent{
 		SliceNr: slice.SliceNr,
 		JobID:   slice.JobID,
 	})
 	if err == nil {
-		i.MessagingService.Publish(i.SliceCompleteChannel, xml)
+		i.MessagingService.Publish(i.SliceCompleteChannel, payload)
 	} else {
 		log.Warn(err)
 	}

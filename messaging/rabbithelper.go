@@ -128,11 +128,11 @@ func beginConsuming(msgs <-chan amqp.Delivery, callback messageReceivedCallback)
 	go func(msgs <-chan amqp.Delivery) {
 		for msg := range msgs {
 			log.WithFields(log.Fields{
-				"routing_key": msg.RoutingKey,
+				"routing_key":    msg.RoutingKey,
 				"correlation_id": msg.CorrelationId,
-				"reply_to": msg.ReplyTo,
-				"consumer_tag": msg.ConsumerTag,
-				"body": string(msg.Body),
+				"reply_to":       msg.ReplyTo,
+				"consumer_tag":   msg.ConsumerTag,
+				"body":           string(msg.Body),
 			}).Debug("Received message.")
 			callback(&msg)
 		}
@@ -182,5 +182,23 @@ var defaultChannelInitializer = func(config *ChannelConfig, ch *amqp.Channel) {
 			config.Consumer(d)
 		})
 	}
+}
 
+func AcknowledgeMessage(delivery *amqp.Delivery, completionType CompletionType) {
+	switch completionType {
+	case Complete:
+		{
+			delivery.Ack(false)
+		}
+	case Incomplete:
+		{
+			delivery.Nack(false, false)
+		}
+	case IncompleteAndRequeue:
+		{
+			delivery.Nack(false, true)
+		}
+	default:
+		log.WithField("type", completionType).Panic("type is not expected here")
+	}
 }

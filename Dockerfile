@@ -1,8 +1,8 @@
 #______________________________________________________________________________
 #### Base Image, to save build time on local dev machine
-ARG GOARCH
-ARG ARCH
-FROM golang:1.12-alpine as builder
+ARG GOARCH=amd64
+ARG ARCH=amd64-edge
+FROM docker.io/library/golang:1.13-alpine as builder
 
 WORKDIR /go/src/app
 
@@ -17,13 +17,15 @@ ARG GIT_COMMIT=unspecified
 
 COPY / .
 RUN \
-    pwd && \
     env GO111MODULE=on go build -ldflags "-X main.Version=${VERSION} -X main.Commit=${GIT_COMMIT}"
 
 #______________________________________________________________________________
 #### Runtime Image
-ARG ARCH
-FROM multiarch/alpine:${ARCH} as runtime
+ARG ARCH=amd64-edge
+FROM docker.io/multiarch/alpine:${ARCH} as runtime
+
+ENTRYPOINT ["clustercode-worker"]
+EXPOSE 8080
 
 RUN \
     apk add --no-cache curl ffmpeg bash && \
@@ -36,10 +38,5 @@ VOLUME \
     /output \
     /var/tmp/clustercode
 
-ENTRYPOINT ["clustercode-worker"]
-CMD ["-c", "clustercode"]
-
 COPY --from=builder /go/src/app/clustercode-worker /usr/bin/clustercode-worker
-RUN \
-    clustercode-worker --save-config /usr/share/clustercode/clustercode.yaml
-USER 1000
+USER 1000:0

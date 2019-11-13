@@ -84,6 +84,7 @@ func (s *RabbitMqService) Publish(config *ChannelConfig, payload string) {
 		"queue_name":    config.ExchangeOptions.QueueName,
 		"exchange_name": config.ExchangeOptions.ExchangeName,
 		"routing_key":   config.ExchangeOptions.RoutingKey,
+		"body":          payload,
 	})
 	logEntry.Debug("Sending message...")
 

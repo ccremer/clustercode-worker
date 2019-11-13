@@ -12,19 +12,15 @@ import (
 )
 
 const (
-	Complete             CompletionType = 0
-	Incomplete           CompletionType = 1
-	IncompleteAndRequeue CompletionType = 2
-	StdInFileDescriptor                 = 0
-	StdOutFileDescriptor                = 1
-	StdErrFileDescriptor                = 2
-	Merge                TaskType       = "MERGE"
-	Split                TaskType       = "SPLIT"
+	StdInFileDescriptor           = 0
+	StdOutFileDescriptor          = 1
+	StdErrFileDescriptor          = 2
+	Merge                TaskType = "MERGE"
+	Split                TaskType = "SPLIT"
 )
 
 type (
-	CompletionType int
-	TaskType string
+	TaskType       string
 	TaskAddedEvent struct {
 		JobID     string `json:"job_id"`
 		Media     Media
@@ -33,9 +29,9 @@ type (
 		delivery  *amqp.Delivery
 	}
 	TaskCompletedEvent struct {
-		JobID  string `json:"job_id"`
-		Amount int
-		Type   TaskType
+		JobID  string   `json:"job_id"`
+		Amount int      `json:"amount"`
+		Type   TaskType `json:"type"`
 	}
 	TaskCancelledEvent struct {
 		JobID    string `json:"job_id"`
@@ -61,15 +57,10 @@ type (
 		FileHash string
 		Path     *url.URL
 	}
-	Message interface {
-		SetComplete(completionType CompletionType)
-	}
 )
 
 func DeserializeSliceAddedEvent(d *amqp.Delivery) (*SliceAddedEvent, error) {
-	event := &SliceAddedEvent{
-		delivery: d,
-	}
+	event := &SliceAddedEvent{}
 	if err := FromJson(string(d.Body), event); err != nil {
 		return nil, err
 	}
@@ -94,18 +85,6 @@ func DeserializeTaskAddedEvent(d *amqp.Delivery) (*TaskAddedEvent, error) {
 		return nil, err
 	}
 	return event, nil
-}
-
-func (e TaskCancelledEvent) SetComplete(completionType CompletionType) {
-	acknowledgeMessage(completionType, e.delivery)
-}
-
-func (e SliceAddedEvent) SetComplete(completionType CompletionType) {
-	acknowledgeMessage(completionType, e.delivery)
-}
-
-func (e TaskAddedEvent) SetComplete(completionType CompletionType) {
-	acknowledgeMessage(completionType, e.delivery)
 }
 
 func (m Media) Priority() int {
@@ -135,25 +114,6 @@ func (m Media) GetSubstitutedPath(basePath string) string {
 		path = u.RequestURI()
 	}
 	return filepath.Join(basePath, u.Port(), path)
-}
-
-func acknowledgeMessage(completionType CompletionType, delivery *amqp.Delivery) {
-	switch completionType {
-	case Complete:
-		{
-			delivery.Ack(false)
-		}
-	case Incomplete:
-		{
-			delivery.Nack(false, false)
-		}
-	case IncompleteAndRequeue:
-		{
-			delivery.Nack(false, true)
-		}
-	default:
-		log.WithField("type", completionType).Panic("type is not expected here")
-	}
 }
 
 func Initialize() {

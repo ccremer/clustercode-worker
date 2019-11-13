@@ -13,7 +13,7 @@ import (
 
 type (
 	HealthCheckStatus string
-	HealthCheckDto struct {
+	HealthCheckDto    struct {
 		Checks  []HealthCheck     `json:"checks"`
 		Outcome HealthCheckStatus `json:"outcome"`
 	}

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/ccremer/clustercode-worker/messaging"
 	log "github.com/sirupsen/logrus"
@@ -20,6 +21,15 @@ func init() {
 
 func LoadConfig() error {
 	//viper.Debug()
+
+	defaults := CreateDefaultConfig()
+	yml, err := yaml.Marshal(defaults)
+	if err != nil {
+		log.Warn("Cannot load default config")
+	} else {
+		viper.SetConfigType("yml")
+		_ = viper.ReadConfig(bytes.NewBuffer(yml))
+	}
 
 	viper.SetEnvPrefix("CC")
 	viper.AutomaticEnv()
@@ -57,7 +67,7 @@ func GetConfig() ConfigMap {
 	return cfg
 }
 
-func SaveConfig() {
+func SaveConfigIfRequested() {
 	cfg := GetConfig()
 
 	d, err := yaml.Marshal(cfg)

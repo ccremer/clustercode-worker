@@ -12,6 +12,7 @@ import (
 )
 
 type (
+	CompletionType  int
 	RabbitMqService struct {
 		Url         *url.URL
 		connection  *amqp.Connection
@@ -51,7 +52,7 @@ type (
 		Args          amqp.Table
 	}
 	messageReceivedCallback func(delivery *amqp.Delivery)
-	ChannelConfig struct {
+	ChannelConfig           struct {
 		Consumer        Consumer         `yaml:"-";mapstructure:"-"`
 		QueueOptions    *QueueOptions    `yaml:"queue,omitempty,flow";mapstructure:"queue"`
 		ExchangeOptions *ExchangeOptions `yaml:"exchange,omitempty,flow";mapstructure:"exchange"`
@@ -65,8 +66,14 @@ type (
 		PrefetchCount int
 		PrefetchSize  int
 	}
-	Consumer func(d *amqp.Delivery)
+	Consumer    func(d *amqp.Delivery)
 	Initializer func(config *ChannelConfig, channel *amqp.Channel)
+)
+
+const (
+	Complete             CompletionType = 0
+	Incomplete           CompletionType = 1
+	IncompleteAndRequeue CompletionType = 2
 )
 
 func NewQueueOptions() *QueueOptions {

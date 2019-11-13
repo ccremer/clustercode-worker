@@ -4,7 +4,7 @@
 
 log:
   level: info
-  ## If your logging stack does not already have timestamps, enable them here.
+  ## If your logging stack already adds timestamps, disable them here.
   # timestamps: false
   ## If you have ELK/EFK stack running, you might want to use the json format for easier filtering.
   # formatter: text
@@ -47,8 +47,8 @@ rabbitmq:
 #api:
 #  http:
 #    address: ':8080'
-#    readyUri: /.well-known/ready
-#    healthUri: /.well-known/health
+#    readinessUri: /health/ready
+#    livenessUri: /health/live
 #  ffmpeg:
 #    defaultargs:
 #      - '-y'
@@ -67,4 +67,4 @@ rabbitmq:
 #prometheus:
 ## The exporter is running on the same port as api.http.address
 #  enabled: true
-#  uri: /.well-known/metrics
+#  uri: /metrics

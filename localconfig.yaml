@@ -3,16 +3,15 @@ role:
 
 log:
   level: debug
+  caller: true
 
 rabbitmq:
   url: amqp://guest:guest@localhost:5672/
 
 api:
-  schema:
-    path: schema/clustercode_v1.xsd
 
 input:
-  dir: input
+  dir: /home/chris/Videos/input
 
 output:
   dir: output

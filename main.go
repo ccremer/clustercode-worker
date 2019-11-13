@@ -24,7 +24,7 @@ func main() {
 	config.ConfigureLogging()
 
 	cfg := config.GetConfig()
-	config.SaveConfig()
+	config.SaveConfigIfRequested()
 
 	role := cfg.Role
 	if role != config.RoleShovel && role != config.RoleCompute {
@@ -38,13 +38,16 @@ func main() {
 
 	service := messaging.NewRabbitMqService(cfg.RabbitMq.Url)
 	api.StartHttpServer(service)
-	service.Start()
 
-	if role == config.RoleCompute {
-		compute.NewComputeInstance(service)
-	} else if role == config.RoleShovel {
-		shovel.NewInstance(service)
-	}
+	go func() {
+		service.Start()
+
+		if role == config.RoleCompute {
+			compute.NewComputeInstance(service)
+		} else if role == config.RoleShovel {
+			shovel.NewShovelInstance(service)
+		}
+	}()
 
 	forever := make(chan bool)
 	log.WithFields(log.Fields{

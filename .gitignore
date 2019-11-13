@@ -6,3 +6,7 @@
 /config.yaml
 !/tmp/.keep
 /tmp
+
+/localconfig.yaml
+/.docker/*.env
+/.env

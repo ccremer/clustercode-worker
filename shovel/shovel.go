@@ -1,6 +1,7 @@
 package shovel
 
 import (
+	"errors"
 	"github.com/ccremer/clustercode-worker/config"
 	"github.com/ccremer/clustercode-worker/entities"
 	"github.com/ccremer/clustercode-worker/messaging"
@@ -8,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"path/filepath"
 	"strconv"
-	"time"
 )
 
 type (
@@ -17,30 +17,27 @@ type (
 		config             config.ConfigMap
 		taskCompletedQueue *messaging.ChannelConfig
 	}
+	TaskResult struct {
+		TaskAddedEvent   *entities.TaskAddedEvent
+		Error            error
+		ExitCode         int
+		SliceCountResult int
+		TaskType         entities.TaskType
+	}
 )
 
-func NewInstance(service *messaging.RabbitMqService) Instance {
-	instance := Instance{
-		MessagingService:   service,
-		taskCompletedQueue: getTaskCompletedQueue(),
-	}
-	service.AddChannelConfig(instance.taskCompletedQueue)
-	service.AddChannelConfig(getTaskAddedQueue(instance.handleTaskAddedEvent))
-	return instance
-}
-
-func (i *Instance) handleTaskAddedEvent(task *entities.TaskAddedEvent) {
+func (i *Instance) ProcessTask(task *entities.TaskAddedEvent) TaskResult {
 	logEntry := log.WithField("task_id", task.JobID)
 	logEntry.Info("Processing task.")
-	var args []string
 	if task.Type == "SPLIT" {
-		args = config.GetConfig().Api.Ffmpeg.SplitArgs
+		return i.splitMedia(task)
 	} else if task.Type == "MERGE" {
-		args = config.GetConfig().Api.Ffmpeg.MergeArgs
+		return i.mergeMedia(task)
 	}
-	c := config.GetConfig()
-	p := process.New(args, config.GetConfig())
+	return TaskResult{Error: errors.New("task type is undefined")}
+}
 
+func (i *Instance) attachStdListeners(c config.ConfigMap, p *process.Process) {
 	switch c.Api.Ffmpeg.Debug {
 	case config.ApiFfmpegDebugLog:
 		if log.IsLevelEnabled(log.DebugLevel) {
@@ -50,38 +47,49 @@ func (i *Instance) handleTaskAddedEvent(task *entities.TaskAddedEvent) {
 		p.StdOutHandler = process.PrintToStdOutHandler
 		p.StdErrHandler = process.PrintToStdErrHandler
 	}
+}
+
+func (i *Instance) splitMedia(task *entities.TaskAddedEvent) TaskResult {
+	logEntry := log.WithField("task_id", task.JobID)
+	c := config.GetConfig()
+
+	args := c.Api.Ffmpeg.SplitArgs
+	p := process.New(args, c)
+	i.attachStdListeners(c, p)
 
 	status := <-p.StartProcess(map[string]string{
-		"${INPUT}":      task.Media.GetSubstitutedPath(c.Input.Dir),
-		"${OUTPUT}":     c.Output.Dir,
-		"${TMP}":        c.Output.TmpDir,
-		"${JOB}":        task.JobID,
-		"${FORMAT}": 	 filepath.Ext(task.Media.RelativePath()),
+		"${INPUT}": task.Media.GetSubstitutedPath(c.Input.Dir),
+		"${OUTPUT}": filepath.Join(
+			c.Output.TmpDir,
+			task.JobID+"_segment_%d"+filepath.Ext(task.Media.RelativePath())),
 		"${SLICE_SIZE}": strconv.Itoa(task.SliceSize),
 	})
 
-	logEntry = logEntry.WithField("exit_code", status)
+	result := TaskResult{
+		TaskAddedEvent: task,
+		TaskType:       entities.Split,
+	}
 
+	logEntry = logEntry.WithField("exit_code", status.Exit)
 	if status.Error != nil || status.Exit > 0 {
 		logEntry.Info("Task failed.")
-		time.Sleep(30 * time.Second)
-		task.SetComplete(entities.IncompleteAndRequeue)
-	} else {
-		logEntry.Info("Task finished.")
-		task.SetComplete(entities.Complete)
-		i.sendTaskCompletedMessage(task)
+		result.Error = status.Error
+		result.ExitCode = status.Exit
+		return result
 	}
+
+	matches, err := filepath.Glob(filepath.Join(c.Output.TmpDir, task.JobID+"_segment_*"))
+	if err == nil {
+		sliceCount := len(matches)
+		log.WithField("sliceCount", sliceCount).Info("Task finished.")
+		result.SliceCountResult = sliceCount
+	} else {
+		log.WithError(err).Panic("Bad pattern.")
+	}
+	return result
 }
 
-func (i *Instance) sendTaskCompletedMessage(task *entities.TaskAddedEvent) {
-	payload, err := entities.ToJson(entities.TaskCompletedEvent{
-		JobID: task.JobID,
-	})
-	if err == nil {
-		i.MessagingService.Publish(i.taskCompletedQueue, payload)
-		task.SetComplete(entities.Complete)
-	} else {
-		task.SetComplete(entities.IncompleteAndRequeue)
-		log.WithError(err).WithField("task_id", task.JobID).Error("Could not serialize to XML. Requeueing.")
-	}
+func (i *Instance) mergeMedia(event *entities.TaskAddedEvent) TaskResult {
+	// TODO: finish
+	return TaskResult{}
 }

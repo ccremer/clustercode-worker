@@ -20,3 +20,5 @@ require (
 	github.com/thoas/go-funk v0.0.0-20181020164546-fbae87fb5b5c
 	gopkg.in/yaml.v2 v2.2.2
 )
+
+go 1.13

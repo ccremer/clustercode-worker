@@ -1,1 +1,11 @@
-*/.idea/
+/tmp
+/Dockerfile
+/*.y*ml
+/clustercode-worker
+/*.md
+/vendor
+/.docker
+/.travis
+/.idea
+/*.env*
+/.git

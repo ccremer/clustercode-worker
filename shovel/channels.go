@@ -8,7 +8,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func getTaskAddedQueue(consumer func(task *entities.TaskAddedEvent)) *messaging.ChannelConfig {
+func createTaskAddedQueue(consumer func(task *entities.TaskAddedEvent) TaskResult) *messaging.ChannelConfig {
 	cfg := config.ConvertToChannelConfig(config.GetConfig().RabbitMq.Channels.Task.Added)
 	cfg.Consumer = func(d *amqp.Delivery) {
 		if event, err := entities.DeserializeTaskAddedEvent(d); err == nil {
@@ -22,4 +22,19 @@ func getTaskAddedQueue(consumer func(task *entities.TaskAddedEvent)) *messaging.
 
 func getTaskCompletedQueue() *messaging.ChannelConfig {
 	return config.ConvertToChannelConfig(config.GetConfig().RabbitMq.Channels.Task.Completed)
+}
+
+func (i *Instance) sendTaskCompletedMessage(result *TaskResult) {
+	task := result.TaskAddedEvent
+	payload, err := entities.ToJson(entities.TaskCompletedEvent{
+		JobID:  task.JobID,
+		Amount: result.SliceCountResult,
+		Type:   result.TaskType,
+	})
+	if err == nil {
+		log.Debug(i.taskCompletedQueue.ExchangeOptions.ExchangeName)
+		i.MessagingService.Publish(i.taskCompletedQueue, payload)
+	} else {
+		log.WithError(err).WithField("task_id", task.JobID).Panic("Could not serialize to JSON.")
+	}
 }
