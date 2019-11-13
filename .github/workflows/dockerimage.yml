@@ -1,0 +1,19 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Register qemu for multiarch build
+      run: docker run --rm --privileged multiarch/qemu-user-static:register --reset
+    - name: Build the Docker image
+      run: docker build . -t docker.io/braindoctor/clustercode-worker:master
