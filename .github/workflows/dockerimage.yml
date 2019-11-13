@@ -3,7 +3,7 @@ name: Docker Image CI
 on:
   push:
     branches:
-      - master
+    - master
 
 jobs:
 
@@ -13,9 +13,14 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Register qemu for multiarch build
-      run: docker run --rm --privileged multiarch/qemu-user-static:register --reset
-    - name: check if experimental are enabled
-      run: docker manifest
+      run: docker run --rm --privileged multiarch/qemu-user-static:register --reset  
     - name: Build the Docker image
       run: docker build . -t docker.io/braindoctor/clustercode-worker:${GITHUB_REF:-latest}
  
+  push:
+    runs-on: ubuntu-latest
+    steps:
+    - name: list docker images
+      run: docker images
+    - name: push docker image
+      run: docker push docker.io/braindoctor/clustercode-worker:${GITHUB_REF:-latest}
