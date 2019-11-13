@@ -41,7 +41,7 @@ jobs:
         --build-arg GIT_COMMIT=${GITHUB_SHA:-unknown}
         .
     - name: Login to Docker hub
-      run: echo "$DOCKER_HUB_PASSWORD" | docker login -u $DOCKER_HUB_USER --password-stdin
+      run: docker login -u "${DOCKER_HUB_USER}" -p "${DOCKER_HUB_PASSWORD}"
     - name: Push Docker image
       run: docker push docker.io/braindoctor/clustercode-worker:${GITHUB_REF##*/}
 
