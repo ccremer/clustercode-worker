@@ -1,56 +1,57 @@
+---
 version: "3"
 services:
   rabbitmq:
     container_name: rabbitmq
     image: "docker.io/library/rabbitmq:3-alpine"
     ports:
-      - "5672:5672"
+    - "5672:5672"
 
   prometheus:
     container_name: prometheus
     image: "docker.io/prom/prometheus:latest"
     ports:
-      - "9090:9090"
+    - "9090:9090"
     volumes:
-      - "./prometheus.yml:/etc/prometheus/prometheus.yml"
+    - "./prometheus.yml:/etc/prometheus/prometheus.yml"
 
   couchdb:
     container_name: couchdb
     image: "docker.io/library/couchdb"
     ports:
-      - "5984:5984"
+    - "5984:5984"
     env_file:
-      - .docker/couchdb.env
+    - .docker/couchdb.env
 
   compute:
     container_name: compute
     image: "docker.io/braindoctor/clustercode-worker:latest"
     build: .
     ports:
-      - "8081:8080"
+    - "8081:8080"
     volumes:
-      - "${CC_VIDEO_INPUT_DIR}:/input"
-      - "./output:/output"
-      - "./tmp:/var/tmp/clustercode"
+    - "${CC_VIDEO_INPUT_DIR}:/input"
+    - "./output:/output"
+    - "./tmp:/var/tmp/clustercode"
     environment:
       CC_ROLE: compute
     env_file:
-      - .docker/worker.env
+    - .docker/worker.env
 
   shovel:
     container_name: shovel
     image: "docker.io/braindoctor/clustercode-worker:latest"
     build: .
     ports:
-      - "8082:8080"
+    - "8082:8080"
     volumes:
-      - "${CC_VIDEO_INPUT_DIR:./input}:/input"
-      - "./output:/output"
-      - "./tmp:/var/tmp/clustercode"
+    - "${CC_VIDEO_INPUT_DIR:-./input}:/input"
+    - "./output:/output"
+    - "./tmp:/var/tmp/clustercode"
     environment:
       CC_ROLE: shovel
     env_file:
-      - .docker/worker.env
+    - .docker/worker.env
 
 networks:
   default:
