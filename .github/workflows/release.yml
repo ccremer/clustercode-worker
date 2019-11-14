@@ -10,7 +10,7 @@ on:
   pull_request: {}
 
 env:
-  REGISTRY_IMAGE: docker.io/braindoctor/clustercode-worker 
+  REGISTRY_IMAGE: docker.io/braindoctor/clustercode-worker
 
 jobs:
   lint:
