@@ -14,10 +14,9 @@ Worker microservice for clustercode [WIP]
 
 ## Building
 
-    sudo snap install go --classic # or whatever package manager you use, tested is Go 1.12
+    sudo snap install go --classic # or whatever package manager you use
     sudo apt-get install g++
-    go mod vendor
-    go build
+    go build ./...
 
 ## Running
 
@@ -44,7 +43,7 @@ Unit tests:
 Integration tests:
 
     docker network create clustercode
-    docker-compose up -d
+    docker-compose up -d --build
     # You may then send some messages to rabbitmq
     test/task.py
     test/slice.py
@@ -53,20 +52,9 @@ Integration tests:
 ## Branches
 
 * `master`: Development branch.
-* `release-2.x`: Release branch of a 2.x version. All 2.x.y bugfixes go in here too after merging.
 
-## Docker Tags
+## Image Tags
 
-* `master`: Upon building the master branch travis will build a docker images with the tag `master` and push to Docker
+* `master`: Upon building the master branch CI pipeline will build a docker images with the tag `master` and push to Docker
   Hub. This should be considered experimental and not particularly stable.
-* `master-armhf`: Same as master, but built for ARM32 architecture (Raspberry Pi's, etc.).
-* `master-arm64`: Same as master, but built for ARM64 architecture (also called aarch64).
-* `master-amd64`: Same as master, built for x86 or AMD64 architecture.
-* `latest`: The latest stable image tag from the latest release branch. If you don't know which to pick, use this.
-* `latest-armhf`, `latest-arm64`, `latest-amd64`: Same schema as the master applies here. 
-* `2.x.y`, `2.x.y-armhf`, `2.x.y-arm64`, `2.x.y-amd64`: Particular Release tags
-
-## Code Style
-
-* Passing `nil` to any of the clustercode specific internal API is considered
-  "wrong use of API". As such, clustercode will panic at some point if you do.
+* `tags`: Particular versioned Release tags
