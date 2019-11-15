@@ -92,7 +92,7 @@ func NewExchangeOptions() *ExchangeOptions {
 	}
 }
 
-func NewRabbitMqService(serverUrl string) *RabbitMqService {
+func NewRabbitMqService(serverUrl string) Service {
 	s := &RabbitMqService{
 		m:           &sync.Mutex{},
 		isConnected: &atomic.Value{},

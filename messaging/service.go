@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// This method is part of an interface, do not call it manually!
+// This method is part of an interface (https://github.com/efritz/watchdog), do not call it manually!
 func (s *RabbitMqService) Retry() bool {
 	conn, err := s.connect()
 	if err != nil {

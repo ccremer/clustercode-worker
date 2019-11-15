@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func StartHttpServer(service *messaging.RabbitMqService) {
+func StartHttpServer(service messaging.Service) {
 
 	cfg := config.GetConfig()
 	addr := cfg.Api.Http.Address

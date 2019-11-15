@@ -7,7 +7,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func NewComputeInstance(service *messaging.RabbitMqService) Instance {
+func NewComputeInstance(service messaging.Service) Instance {
 	i := Instance{
 		MessagingService:  service,
 		sliceCompleteChan: make(chan *entities.SliceCompletedEvent),

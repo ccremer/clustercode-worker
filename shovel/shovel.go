@@ -13,7 +13,7 @@ import (
 
 type (
 	Instance struct {
-		MessagingService   *messaging.RabbitMqService
+		MessagingService   messaging.Service
 		config             config.ConfigMap
 		taskCompletedQueue *messaging.ChannelConfig
 	}

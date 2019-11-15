@@ -24,7 +24,7 @@ type (
 	}
 	Instance struct {
 		config           config.ConfigMap
-		MessagingService *messaging.RabbitMqService
+		MessagingService messaging.Service
 	}
 )
 
@@ -41,7 +41,6 @@ func (i *Instance) handleLiveness(w http.ResponseWriter, r *http.Request) {
 
 	dto.Checks = append(dto.Checks, checkOutputDir(i.config.Output.Dir))
 	dto.Checks = append(dto.Checks, checkInputDir(i.config.Input.Dir))
-	dto.Checks = append(dto.Checks, checkMessagingService(i.MessagingService))
 
 	respondHealthRequest(w, r, &dto)
 }
@@ -106,7 +105,7 @@ func checkOutputDir(dir string) HealthCheck {
 		check.Data["writable"] = false
 		check.Status = DownKey
 		check.Data["error"] = err.Error()
-		log.Warnf("%s", err)
+		log.WithError(err).WithField("check", "output_dir").Warn("Healthcheck failed.")
 	}
 	return check
 }
@@ -122,11 +121,12 @@ func checkInputDir(path string) HealthCheck {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		check.Status = DownKey
 		check.Data["error"] = err.Error()
+		log.WithError(err).WithField("check", "input_dir").Warn("Healthcheck failed.")
 	}
 	return check
 }
 
-func checkMessagingService(service *messaging.RabbitMqService) HealthCheck {
+func checkMessagingService(service messaging.Service) HealthCheck {
 	check := HealthCheck{
 		Id: "rabbitmq",
 		Data: map[string]interface{}{

@@ -14,7 +14,7 @@ import (
 
 type (
 	Instance struct {
-		MessagingService     *messaging.RabbitMqService
+		MessagingService     messaging.Service
 		SliceCompleteChannel *messaging.ChannelConfig
 		sliceCompleteChan    chan *entities.SliceCompletedEvent
 		CurrentTask          *entities.SliceAddedEvent
