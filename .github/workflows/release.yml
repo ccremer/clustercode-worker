@@ -7,7 +7,6 @@ on:
     - master
     tags:
     - "*"
-  pull_request: {}
 
 env:
   REGISTRY_IMAGE: docker.io/braindoctor/clustercode-worker
@@ -24,6 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
+    - uses: actions/cache@v1
+      with:
+        path: /home/runner/go/pkg/mod
+        key: ${{ runner.os }}-go
     - name: Run unit tests
       run: go test ./...
 
@@ -56,6 +59,10 @@ jobs:
     if: github.ref != 'refs/heads/master'
     steps:
     - uses: actions/checkout@v1
+    - uses: actions/cache@v1
+      with:
+        path: /home/runner/go/pkg/mod
+        key: ${{ runner.os }}-go
     - name: Build
       run: go build ./...
     - name: Create Release
