@@ -19,7 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - name: print go path
-      run: ls -lah $(go env GOPATH) && tree $(go env GOPATH)
+    - uses: actions/cache@v1
+      with:
+        path: /home/runner/go/pkg/mod
+        key: ${{ runner.os }}-go
     - name: Run unit tests
       run: go test ./...
