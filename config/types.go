@@ -41,6 +41,7 @@ func SetupFlags() {
 	flag.String("api.http.address", cfg.Api.Http.Address, "HTTP API server listen address")
 	flag.Bool("prometheus.enabled", cfg.Prometheus.Enabled, "Whether metrics exporter is enabled")
 	flag.String("save-config", "", "Save the final config to the given file path and exit")
+	flag.Bool("version", false, "Print version and exit")
 
 	if err := viper.BindPFlags(flag.CommandLine); err != nil {
 		log.Fatal(err)

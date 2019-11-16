@@ -6,17 +6,17 @@ FROM docker.io/library/golang:1.13-alpine as builder
 
 WORKDIR /go/src/app
 
-COPY ["go.mod", "./"]
+COPY ["go.mod", "go.sum", "./"]
 
 RUN \
-    env GO111MODULE=on go mod download
+    go mod download
 
 ARG VERSION=unspecified
 ARG GIT_COMMIT=unspecified
 
 COPY / .
 RUN \
-    env GO111MODULE=on go build -ldflags "-X main.Version=${VERSION} -X main.Commit=${GIT_COMMIT}"
+    go build -ldflags "-X main.version=${VERSION} -X main.commit=${GIT_COMMIT} -X main.date=$(date -u '+%Y-%m-%dT%TZ')"
 
 #______________________________________________________________________________
 #### Runtime Image
