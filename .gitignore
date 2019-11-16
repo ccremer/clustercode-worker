@@ -10,3 +10,4 @@
 /localconfig.yaml
 /.docker/*.env
 /.env
+/dist
